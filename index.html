@@ -124,6 +124,8 @@ code{background:var(--bg);padding:1px 4px;border-radius:4px}
 .optcard .k{font-size:12px;color:var(--muted)} .optcard .d{font-size:15px;margin:2px 0 6px}
 .scrollx{overflow-x:auto} #opt-single td.hit,.optmx td.hit{background:rgba(91,75,138,.14);font-weight:700}
 .optmx td,.optmx th{text-align:center;white-space:nowrap} .optmx a,#opt-front a{color:var(--hyb-t);font-weight:700}
+.optcmp{border:1px solid var(--line);border-radius:9px;padding:6px 14px 2px;margin-bottom:8px} .optcmp td.hit{background:rgba(30,123,74,.14);font-weight:700}
+.pzrec{margin:4px 0 6px;padding-left:20px} .pzrec li{margin-bottom:3px}
 #opt-prog{height:6px;background:var(--grid);border-radius:3px;overflow:hidden;margin:4px 0 10px} #opt-bar{height:100%;width:0;background:var(--hyb)}
 </style>
 </head>
@@ -2455,6 +2457,9 @@ const Optimizer = (() => {
     }
     return best;
   }
+  function pickIn(rows, keys) {
+    const copy = rows.map(r => ({ id: r.id, c: r.c, m: r.m, n: {} })); normalise(copy); return pick(copy, keys);
+  }
   function pareto(rows, kx, ky) {          // candidates not beaten on both goals at once
     return rows.filter(a => !rows.some(b => b !== a && b.n[kx] <= a.n[kx] && b.n[ky] <= a.n[ky] && (b.n[kx] < a.n[kx] || b.n[ky] < a.n[ky])));
   }
@@ -2516,12 +2521,23 @@ const Optimizer = (() => {
       <p class="note">ข้อแลกเปลี่ยน: ด้านที่เสียมากที่สุดคือ <b>${weak.name}</b> (อันดับ ${rankOf(r, weak.k)} / ${ROWS.length}) · C_B ตอนไม่กด ${r.m.C0.toFixed(2)} pF · ความหนาเทียบเท่าของแผ่น ${r.m.te.toFixed(1)} µm</p>
       <button class="primary" data-apply="${r.id}">ใช้ค่านี้ในระบบจำลอง</button></div>`;
   }
+  // the same goals answered twice: every layer made by s-gDLP, and no process restriction
+  function compare(keys) {
+    const a = pickIn(ALL.filter(r => isPrinted(r.c)), keys), b = pickIn(ALL, keys);
+    if (!a || !b) return "";
+    const cell = (r, g) => { const other = r === a ? b : a, better = g.low ? r.m[g.k] < other.m[g.k] : r.m[g.k] > other.m[g.k]; return `<td class="${better && r.m[g.k] !== other.m[g.k] ? "hit" : ""}">${fmtV(r.m[g.k], g)} ${g.unit}</td>`; };
+    return `<div class="optcmp"><h4>เทียบสองแนวทางสำหรับเป้าหมายเดียวกัน</h4><table><tr><th></th><th>ผลิตด้วย s-gDLP ทุกชั้น · #${a.id}</th><th>ไม่จำกัดกระบวนการ · #${b.id}</th></tr>
+      <tr><td>แบบ</td><td>${describe(a.c)}</td><td>${describe(b.c)}</td></tr>
+      ${GOALS.map(g => `<tr><td>${keys.includes(g.k) ? "<b>" + g.name + "</b>" : g.name}</td>${cell(a, g)}${cell(b, g)}</tr>`).join("")}
+      <tr><td></td><td><button data-apply="${a.id}">ใช้แบบนี้</button></td><td><button data-apply="${b.id}">ใช้แบบนี้</button></td></tr></table>
+      <p class="note">ช่องที่ระบายสีคือค่าที่ดีกว่าในแถวนั้น · “ไม่จำกัดกระบวนการ” รวม silicone ที่ต้องหล่อ, ฟิล์ม PI และ electrode โลหะ ซึ่งต้องมีขั้นตอนและเครื่องมือนอกเหนือจาก s-gDLP</p></div>`;
+  }
   function render() {
     if (!ROWS) { renderPiezo(); return; }
     // goal chips
     $q("#opt-goals").innerHTML = GOALS.map(g => `<button class="chip ${chosen.includes(g.k) ? "on" : ""}" data-goal="${g.k}" title="${g.long}">${g.name}</button>`).join("");
     const best = pick(ROWS, chosen.length ? chosen : ["dead"]); shown = best;
-    $q("#opt-pick").innerHTML = `<h4>ถ้าต้องการ ${chosen.map(k => "“" + goal(k).name + "”").join(" + ")} ${chosen.length > 1 ? "พร้อมกัน" : "ดีที่สุด"} → แนะนำ</h4>` + card(best, chosen);
+    $q("#opt-pick").innerHTML = `<h4>ถ้าต้องการ ${chosen.map(k => "“" + goal(k).name + "”").join(" + ")} ${chosen.length > 1 ? "พร้อมกัน" : "ดีที่สุด"} → แนะนำ${onlyPrinted ? " (ในกลุ่มที่พิมพ์ด้วย s-gDLP ได้ทุกชั้น)" : ""}</h4>` + card(best, chosen) + compare(chosen);
     // best for each single goal
     $q("#opt-single").innerHTML = `<table><tr><th>ถ้าต้องการให้ด้านนี้ดีที่สุด</th><th>แบบที่ควรใช้</th><th>ค่าที่ได้</th>${GOALS.map(g => `<th title="${g.long}">${g.name}</th>`).join("")}<th></th></tr>` +
       GOALS.map(g => { const r = pick(ROWS, [g.k]); return `<tr><td><b>${g.name}</b></td><td>#${r.id} ${describe(r.c)}</td><td><b>${fmtV(r.m[g.k], g)}</b> ${g.unit}</td>${GOALS.map(h => `<td class="${h.k === g.k ? "hit" : ""}">${fmtV(r.m[h.k], h)}</td>`).join("")}<td><button data-apply="${r.id}">ใช้</button></td></tr>`; }).join("") + "</table>";
@@ -2539,12 +2555,13 @@ const Optimizer = (() => {
   function renderPiezo() {
     // recompute only when the design changed (not on every animation frame or pressure change)
     const key = JSON.stringify(Object.assign({}, P, { p_view_kPa: 0, dT_K: 0 })) + onlyPrinted; if (key === pzKey) return; pzKey = key;
-    const rows = piezoRank(P), best = piezoPick(rows, onlyPrinted), eng = (v, u) => typeof fmtSI === "function" ? fmtSI(v, u) : v.toExponential(2) + " " + u;
+    const rows = piezoRank(P), bestP = piezoPick(rows, true), bestA = piezoPick(rows, false), best = onlyPrinted ? bestP : bestA, eng = (v, u) => typeof fmtSI === "function" ? fmtSI(v, u) : v.toExponential(2) + " " + u;
     const stat = r => !r.sim ? '<span class="note">คำนวณไม่ได้: ไม่มีค่า d33</span>' : r.z.lead ? '<span class="bad">มีตะกั่ว</span>' : onlyPrinted && !r.z.print ? '<span class="note">ไม่ได้พิมพ์ด้วย s-gDLP</span>' : r === best ? '<span class="good">แนะนำ</span>' : "ผ่านเงื่อนไข";
     const body = rows.slice().sort((a, b) => (b.sim ? b.V10 : -1) - (a.sim ? a.V10 : -1)).map(r => `<tr class="${r === best ? "hit" : ""}"><td><b>${r.k}</b><div class="note">Table 1: ${r.z.tang}</div></td><td>${r.z.route}</td>` +
       (r.sim ? `<td>${r.z.d33}</td><td>${r.z.er != null ? r.z.er : "—"}</td><td>${r.z.t}</td><td><b>${eng(r.V10, "V")}</b></td><td>${eng(r.Q10, "C")}</td><td>${r.pyro != null ? "×" + r.pyro.toFixed(0) : "ไม่มีค่า"}</td><td>${isFinite(r.dead) ? r.dead.toPrecision(3) : "ไม่แตะ"}</td>` : '<td colspan="7" class="note">' + r.z.src + "</td>") +
       `<td>${stat(r)}</td><td>${r.sim ? `<button data-pz="${r.k}">ใช้</button>` : ""}</td></tr>`).join("");
-    $q("#opt-piezo").innerHTML = (best ? `<p><b>แนะนำ: ${best.k}</b> — ให้แรงดันสูงสุด (${eng(best.V10, "V")} ต่อการกด 10 kPa) ในกลุ่มที่${onlyPrinted ? "พิมพ์ด้วย s-gDLP ได้และ" : ""}ไม่มีตะกั่ว · dead-zone เมื่อใส่ชั้นนี้ ${best.dead.toPrecision(3)} kPa</p>` : "<p>ไม่มีวัสดุที่ผ่านเงื่อนไข</p>") +
+    const line = (r, label) => r ? `<li><b>${label}: ${r.k}</b> — ${eng(r.V10, "V")} ต่อการกด 10 kPa · dead-zone เมื่อใส่ชั้นนี้ ${r.dead.toPrecision(3)} kPa · ${r.z.route}</li>` : "";
+    $q("#opt-piezo").innerHTML = `<ul class="pzrec">${line(bestP, "ถ้าผลิตด้วย s-gDLP ทุกชั้น")}${line(bestA, "ถ้าไม่จำกัดกระบวนการ")}</ul><p class="note">เกณฑ์: แรงดันสูงสุดในกลุ่มที่ไม่มีตะกั่ว · แถวที่ระบายสีคือคำแนะนำตามตัวกรองด้านบน</p>` +
       `<table><tr><th>วัสดุของชั้น piezo</th><th>วิธีทำ</th><th>d33 (pC/N)</th><th>εr</th><th>หนา (µm)</th><th>แรงดันที่ 10 kPa</th><th>ประจุที่ 10 kPa</th><th>pyro: 1 K เทียบ 10 kPa</th><th>dead-zone (kPa)</th><th>สถานะ</th><th></th></tr>${body}</table>
       <p class="note">คำนวณบนโครงสร้างที่ตั้งอยู่ในแผงซ้ายตอนนี้ โดยเปลี่ยนเฉพาะชั้นบนสุดเป็นวัสดุนั้นที่ความหนาตามคอลัมน์ · แรงดัน = d33·p·A ÷ (C ของชั้น + C ของสาย ${P.pz_Ccable_pF} pF) วัสดุที่ εr สูงมาก (เซรามิก) จึงให้ประจุมากแต่แรงดันน้อย · “pyro” คือประจุจากอุณหภูมิเปลี่ยน 1 K หารด้วยประจุจากการกด 10 kPa ยิ่งมากยิ่งถูกอุณหภูมิรบกวน · ค่าคงที่และ ⚠ ของแต่ละวัสดุดูได้โดยเลือกวัสดุนั้นในแผงซ้าย หรือในหน้าความรู้ research_piezo_materials และ research_printable_piezo</p>`;
   }
@@ -2562,7 +2579,7 @@ const Optimizer = (() => {
     $q("#opt-front").innerHTML = `Pareto front มี ${front.length} แบบ: ` + front.slice().sort((a, b) => a.n[kx] - b.n[kx]).slice(0, 12).map(r => `<a href="#" data-show="${r.id}" title="${describe(r.c).replace(/<[^>]+>/g, "")}">#${r.id}</a> (${fmtV(r.m[kx], gx)} · ${fmtV(r.m[ky], gy)})`).join(" · ") + (front.length > 12 ? " …" : "");
   }
   function apply(id) {
-    const r = ROWS.find(x => x.id === +id); if (!r) return;
+    const r = ALL.find(x => x.id === +id); if (!r) return;
     P = applyTo(P, r.c); needModel = true; buildControls(); recompute();
     $q("#opt-status").textContent = `ใช้แบบ #${r.id} แล้ว — ดูผลที่ระบบจำลองด้านบน`;
     document.getElementById("stage-card").scrollIntoView({ behavior: "smooth", block: "start" });
