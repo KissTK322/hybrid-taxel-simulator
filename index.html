@@ -125,6 +125,7 @@ code{background:var(--bg);padding:1px 4px;border-radius:4px}
 .scrollx{overflow-x:auto} #opt-single td.hit,.optmx td.hit{background:rgba(91,75,138,.14);font-weight:700}
 .optmx td,.optmx th{text-align:center;white-space:nowrap} .optmx a,#opt-front a{color:var(--hyb-t);font-weight:700}
 .optcmp{border:1px solid var(--line);border-radius:9px;padding:6px 14px 2px;margin-bottom:8px} .optcmp td.hit{background:rgba(30,123,74,.14);font-weight:700}
+.pzwhy{min-width:300px;font-size:12px}
 .pzrec{margin:4px 0 6px;padding-left:20px} .pzrec li{margin-bottom:3px}
 #opt-prog{height:6px;background:var(--grid);border-radius:3px;overflow:hidden;margin:4px 0 10px} #opt-bar{height:100%;width:0;background:var(--hyb)}
 </style>
@@ -422,18 +423,18 @@ const MATERIALS = {
 // t = typical layer thickness (um) used by the material ranking, print = made by filler-in-photoresin UV printing.
 // Sources: knowledge/research_piezo_materials.md and research_printable_piezo.md. d33 = null means "cannot be simulated".
 const PIEZO = {
-  "PVDF film (piezo)":            { tang: "PVDF", d33: 33, er: 12, pyro: 30, Tmax: 80, t: 28, E: 3000, print: false, lead: false, route: "ฟิล์มสำเร็จรูปที่ poling แล้ว นำมาแปะ", src: "MSI/TE Piezo Film Sensors Technical Manual Table 1: d33 −33 pC/N, εr 12–13, 2–4 GPa, pyro 30 µC/m²K" },
-  "P(VDF-TrFE) (piezo)":          { tang: "PVDF-TrFE", d33: 30, er: 7.5, pyro: 40, Tmax: 130, t: 10, E: 4000, print: false, lead: false, route: "spin coat + อบ 140–145 °C + poling ถึง 100 V/µm", src: "Piezotech FC20: d33 −24 ถึง −30, Curie 136 °C · MSI manual: εr 7–8, 3–5 GPa, pyro 40 · ความหนา 10 µm ⚠" },
-  "Resin + BaTiO3 (print)":       { tang: "BaTiO₃", d33: 27.7, er: 28, pyro: null, Tmax: 120, t: 30, E: 1000, print: true, lead: false, route: "อนุภาค 50 nm เคลือบ silane 30 wt% ใน photoresin + corona poling 110 °C", src: "Liu et al., Research 2022: 27.7 pC/N · ผสมตรง ๆ ได้ 2–3 pC/N (Tiller 2020) · εr ≈ 28 คำนวณจาก d33/g33 ⚠ · modulus ⚠" },
-  "Resin + PVDF powder (print)":  { tang: "PVDF", d33: 7.34, er: 8.47, pyro: null, Tmax: 80, t: 30, E: 1000, print: true, lead: false, route: "ผง PVDF 35 wt% ใน photoresin + corona poling", src: "Govindarajan et al., Sensors 2024 (อ่านผ่านตัวสรุปหน้าเว็บ) · modulus ⚠" },
-  "Resin + PZT (print)":          { tang: "PZT", d33: 22, er: null, pyro: null, Tmax: 230, t: 30, E: 1000, print: true, lead: true, route: "อนุภาค PZT ใน photoresin 405 nm (มีตะกั่ว)", src: "Wang (405 nm): 22 ± 4 pC/N · εr ไม่มีค่า จึงใช้ค่าของ composite BaTiO₃ (28) ⚠" },
-  "PZT-5H ceramic":               { tang: "PZT", d33: 650, er: 3800, pyro: null, Tmax: 230, t: 20, E: 56000, print: false, lead: true, route: "เซรามิกเผา 1000–1300 °C (Tang p.4) มีตะกั่ว", src: "piezo.com: 650 pC/N, εr 3800, 50–62 GPa, Curie 230 °C · ความหนา 20 µm ⚠" },
-  "Sm:PMN-PT film":               { tang: "Sm: PMN-PT", d33: 380, er: null, pyro: null, Tmax: null, t: 1, E: 60000, print: false, lead: true, route: "sol–gel บน mica (Tang p.5) มีตะกั่ว", src: "Tang 2025 p.5: d33 380 pm/V · εr และ modulus ไม่มีค่า จึงใช้ของ PZT ⚠" },
-  "BaTiO3 ceramic":               { tang: "BaTiO₃", d33: 191, er: 1680, pyro: null, Tmax: 125, t: 20, E: 65000, print: false, lead: false, route: "เซรามิกเผา หรือ hydrothermal บน PDMS (Table 1)", src: "ค่าเนื้อเซรามิก: 191 pC/N, εr 1680, 50–80 GPa, Curie 120–130 °C · ความหนา 20 µm ⚠" },
-  "ZnO film":                     { tang: "ZnO, ZnO p-n, Al-ZnO", d33: 12.3, er: 11.26, pyro: null, Tmax: null, t: 1, E: 125000, print: false, lead: false, route: "hydrothermal หรือ spin coating (Table 1)", src: "ผลึกเดี่ยว 12.3 pC/N, εr 11.26 · modulus ไม่พบ ใช้ 125 GPa ⚠ · ฟิล์ม 1 µm ⚠" },
-  "AlN film":                     { tang: "AlN", d33: 3.5, er: 9.5, pyro: 4.8, Tmax: null, t: 1, E: 330000, print: false, lead: false, route: "sputtering (Table 1)", src: "บน polyimide 3–4 pC/N, εr 9.5, 330 GPa (เนื้อเซรามิก), pyro 4.8 (abstract) · ฟิล์ม 1 µm ⚠" },
-  "PVDF/ZnO, MoS2-PVDF (ไม่มีค่าคงที่)": { tang: "PVDF/ZnO, MoS2-PVDF", d33: null, print: false, lead: false, route: "electrospinning / milling (Table 1)", src: "Table 1 ให้แต่สมรรถนะของ sensor ไม่พบ d33 ของวัสดุ" },
-  "Hydrogel (ไม่มีค่าคงที่)":      { tang: "PAN-PVDF, composite, silk hydrogel", d33: null, print: false, lead: false, route: "hydrogel มีน้ำ (Table 1)", src: "ไม่พบ d33 ที่มีแหล่งอ้างอิง และค่าเปลี่ยนตามความชื้น" },
+  "PVDF film (piezo)":            { why: "โค้งงอได้ มีขายเป็นฟิล์มที่ poling แล้วหลายความหนา จึงไม่ต้องอบหรือ poling เอง · ใช้ได้ถึงราว 80 °C และเป็น pyroelectric", tang: "PVDF", d33: 33, er: 12, pyro: 30, Tmax: 80, t: 28, E: 3000, print: false, lead: false, route: "ฟิล์มสำเร็จรูปที่ poling แล้ว นำมาแปะ", src: "MSI/TE Piezo Film Sensors Technical Manual Table 1: d33 −33 pC/N, εr 12–13, 2–4 GPa, pyro 30 µC/m²K" },
+  "P(VDF-TrFE) (piezo)":          { why: "เคลือบเป็นชั้นบางได้เอง (บางกว่าฟิล์ม PVDF จึงทำให้แผ่นแข็งขึ้นน้อย) แต่ต้องอบ 140–145 °C และ poling ถึง 100 V/µm ซึ่งต้องตรวจว่า TPU dome ทนได้", tang: "PVDF-TrFE", d33: 30, er: 7.5, pyro: 40, Tmax: 130, t: 10, E: 4000, print: false, lead: false, route: "spin coat + อบ 140–145 °C + poling ถึง 100 V/µm", src: "Piezotech FC20: d33 −24 ถึง −30, Curie 136 °C · MSI manual: εr 7–8, 3–5 GPa, pyro 40 · ความหนา 10 µm ⚠" },
+  "Resin + BaTiO3 (print)":       { why: "ไม่มีตะกั่ว พิมพ์ด้วย UV ได้เหมือนชั้น resin-CNT ต้องเคลือบอนุภาคด้วย silane (ถ้าไม่เคลือบ d33 เหลือ 2–3 pC/N) และ poling ราว 110 °C", tang: "BaTiO₃", d33: 27.7, er: 28, pyro: null, Tmax: 120, t: 30, E: 1000, print: true, lead: false, route: "อนุภาค 50 nm เคลือบ silane 30 wt% ใน photoresin + corona poling 110 °C", src: "Liu et al., Research 2022: 27.7 pC/N · ผสมตรง ๆ ได้ 2–3 pC/N (Tiller 2020) · εr ≈ 28 คำนวณจาก d33/g33 ⚠ · modulus ⚠" },
+  "Resin + PVDF powder (print)":  { why: "พิมพ์ด้วย UV ได้และไม่ต้องเคลือบ silane แต่ d33 ต่ำ (7 pC/N) เพราะผง PVDF ในเนื้อ resin มี β-phase น้อย", tang: "PVDF", d33: 7.34, er: 8.47, pyro: null, Tmax: 80, t: 30, E: 1000, print: true, lead: false, route: "ผง PVDF 35 wt% ใน photoresin + corona poling", src: "Govindarajan et al., Sensors 2024 (อ่านผ่านตัวสรุปหน้าเว็บ) · modulus ⚠" },
+  "Resin + PZT (print)":          { why: "d33 ของ composite พอ ๆ กับ BaTiO₃ จึงไม่มีเหตุผลให้ยอมรับตะกั่ว", tang: "PZT", d33: 22, er: null, pyro: null, Tmax: 230, t: 30, E: 1000, print: true, lead: true, route: "อนุภาค PZT ใน photoresin 405 nm (มีตะกั่ว)", src: "Wang (405 nm): 22 ± 4 pC/N · εr ไม่มีค่า จึงใช้ค่าของ composite BaTiO₃ (28) ⚠" },
+  "PZT-5H ceramic":               { why: "d33 สูงที่สุดในตาราง แต่เป็นเซรามิกเปราะ ต้องเผา 1000–1300 °C ซึ่ง TPU และ PDMS ทนไม่ได้", tang: "PZT", d33: 650, er: 3800, pyro: null, Tmax: 230, t: 20, E: 56000, print: false, lead: true, route: "เซรามิกเผา 1000–1300 °C (Tang p.4) มีตะกั่ว", src: "piezo.com: 650 pC/N, εr 3800, 50–62 GPa, Curie 230 °C · ความหนา 20 µm ⚠" },
+  "Sm:PMN-PT film":               { why: "d33 สูง แต่ทำด้วย sol–gel บน mica ที่ต้องอบอุณหภูมิสูง และไม่มีค่า εr กับ modulus ให้ตรวจ", tang: "Sm: PMN-PT", d33: 380, er: null, pyro: null, Tmax: null, t: 1, E: 60000, print: false, lead: true, route: "sol–gel บน mica (Tang p.5) มีตะกั่ว", src: "Tang 2025 p.5: d33 380 pm/V · εr และ modulus ไม่มีค่า จึงใช้ของ PZT ⚠" },
+  "BaTiO3 ceramic":               { why: "ไม่มีตะกั่ว แต่ในรูปเซรามิกต้องเผาและเปราะ · รูปที่ใช้ได้จริงกับ sensor นิ่มคือผสมใน polymer (ดูแถว Resin + BaTiO₃)", tang: "BaTiO₃", d33: 191, er: 1680, pyro: null, Tmax: 125, t: 20, E: 65000, print: false, lead: false, route: "เซรามิกเผา หรือ hydrothermal บน PDMS (Table 1)", src: "ค่าเนื้อเซรามิก: 191 pC/N, εr 1680, 50–80 GPa, Curie 120–130 °C · ความหนา 20 µm ⚠" },
+  "ZnO film":                     { why: "ทำได้ที่อุณหภูมิต่ำ (hydrothermal) และไม่ต้อง poling แต่ d33 ต่ำ และฟิล์มบางบนยางแตกง่ายเมื่อยุบมาก", tang: "ZnO, ZnO p-n, Al-ZnO", d33: 12.3, er: 11.26, pyro: null, Tmax: null, t: 1, E: 125000, print: false, lead: false, route: "hydrothermal หรือ spin coating (Table 1)", src: "ผลึกเดี่ยว 12.3 pC/N, εr 11.26 · modulus ไม่พบ ใช้ 125 GPa ⚠ · ฟิล์ม 1 µm ⚠" },
+  "AlN film":                     { why: "ไม่ต้อง poling และทนอุณหภูมิสูง แต่ d33 ต่ำที่สุดในตาราง และต้องใช้เครื่อง sputter", tang: "AlN", d33: 3.5, er: 9.5, pyro: 4.8, Tmax: null, t: 1, E: 330000, print: false, lead: false, route: "sputtering (Table 1)", src: "บน polyimide 3–4 pC/N, εr 9.5, 330 GPa (เนื้อเซรามิก), pyro 4.8 (abstract) · ฟิล์ม 1 µm ⚠" },
+  "PVDF/ZnO, MoS2-PVDF (ไม่มีค่าคงที่)": { why: "เป็น PVDF ที่เติม filler เพื่อเพิ่ม β-phase ต้องใช้ electrospinning หรือ milling · Table 1 ให้แต่สมรรถนะของ sensor จึงใส่ค่าใน model ไม่ได้", tang: "PVDF/ZnO, MoS2-PVDF", d33: null, print: false, lead: false, route: "electrospinning / milling (Table 1)", src: "Table 1 ให้แต่สมรรถนะของ sensor ไม่พบ d33 ของวัสดุ" },
+  "Hydrogel (ไม่มีค่าคงที่)":      { why: "มีน้ำเป็นองค์ประกอบ ค่าเปลี่ยนตามความชื้นและแห้งได้ ไม่เหมาะกับ sensor ที่ต้องเสถียรระยะยาว", tang: "PAN-PVDF, composite, silk hydrogel", d33: null, print: false, lead: false, route: "hydrogel มีน้ำ (Table 1)", src: "ไม่พบ d33 ที่มีแหล่งอ้างอิง และค่าเปลี่ยนตามความชื้น" },
 };
 Object.keys(PIEZO).forEach(k => { const z = PIEZO[k]; if (z.d33 != null) MATERIALS[k] = { E: z.E, nu: 0.35, er: z.er != null ? z.er : 28, src: z.src }; });
 // TPU: guess (no sourced number). Silicones: +0.3 %/K is the rubber-elasticity estimate E ~ T (1/T at 300 K), not a measurement.
@@ -2475,8 +2476,8 @@ const Optimizer = (() => {
   }
   // recommended = largest voltage signal among the materials that pass the filters (printable by s-gDLP, lead-free)
   function piezoPick(rows, printedOnly) {
-    const okr = rows.filter(r => r.sim && !r.z.lead && (!printedOnly || r.z.print));
-    return okr.sort((a, b) => b.V10 - a.V10)[0] || null;
+    const okr = rows.filter(r => r.sim && !r.z.lead && (!printedOnly || r.z.print)).sort((a, b) => b.V10 - a.V10);
+    return okr[0] || null;
   }
   function runSync(P, mode, opt) {
     const rows = candidates(mode).map((c, i) => { const m = evaluate(applyTo(P, c), opt); m.fab = fabScore(c); return { id: i + 1, c, m, n: {} }; });
@@ -2552,18 +2553,30 @@ const Optimizer = (() => {
     drawScatter(); renderPiezo();
   }
   let pzKey = null;
+  // one sentence per material: why it is or is not the choice, from the model numbers plus the material facts
+  function piezoReason(r, best, bestP) {
+    const z = r.z;
+    if (!r.sim) return `<b class="bad">ไม่เลือก</b> — คำนวณไม่ได้เพราะไม่มีค่า d33 ที่มีแหล่งอ้างอิง · ${z.why}`;
+    const pct = Math.round(100 * r.V10 / best.V10), parts = [];
+    if (r === best) return `<b class="good">เลือก</b> — แรงดันสูงสุดในกลุ่มที่ไม่มีตะกั่ว · ${z.why}`;
+    if (z.lead) parts.push("มีตะกั่ว");
+    if (r.dead > 3 * best.dead) parts.push(`แข็งมาก (E ${(z.E / 1000).toFixed(0)} GPa) ทำให้ dead-zone ของช่อง R กว้างเป็น ${r.dead.toPrecision(2)} kPa`);
+    if (pct < 20) parts.push(`แรงดันเพียง ${pct < 1 ? "<1" : pct} % ของตัวที่เลือก${z.er > 100 ? " เพราะ εr สูงทำให้ความจุมาก" : ""}`);
+    else parts.push(`แรงดัน ${pct} % ของตัวที่เลือก`);
+    const head = z.lead || r.dead > 3 * best.dead || pct < 20 ? '<b class="bad">ไม่เลือก</b>' : "<b>ทางเลือกรอง</b>";
+    return `${head} — ${parts.join(" · ")} · ${z.why}`;
+  }
   function renderPiezo() {
     // recompute only when the design changed (not on every animation frame or pressure change)
-    const key = JSON.stringify(Object.assign({}, P, { p_view_kPa: 0, dT_K: 0 })) + onlyPrinted; if (key === pzKey) return; pzKey = key;
-    const rows = piezoRank(P), bestP = piezoPick(rows, true), bestA = piezoPick(rows, false), best = onlyPrinted ? bestP : bestA, eng = (v, u) => typeof fmtSI === "function" ? fmtSI(v, u) : v.toExponential(2) + " " + u;
-    const stat = r => !r.sim ? '<span class="note">คำนวณไม่ได้: ไม่มีค่า d33</span>' : r.z.lead ? '<span class="bad">มีตะกั่ว</span>' : onlyPrinted && !r.z.print ? '<span class="note">ไม่ได้พิมพ์ด้วย s-gDLP</span>' : r === best ? '<span class="good">แนะนำ</span>' : "ผ่านเงื่อนไข";
-    const body = rows.slice().sort((a, b) => (b.sim ? b.V10 : -1) - (a.sim ? a.V10 : -1)).map(r => `<tr class="${r === best ? "hit" : ""}"><td><b>${r.k}</b><div class="note">Table 1: ${r.z.tang}</div></td><td>${r.z.route}</td>` +
-      (r.sim ? `<td>${r.z.d33}</td><td>${r.z.er != null ? r.z.er : "—"}</td><td>${r.z.t}</td><td><b>${eng(r.V10, "V")}</b></td><td>${eng(r.Q10, "C")}</td><td>${r.pyro != null ? "×" + r.pyro.toFixed(0) : "ไม่มีค่า"}</td><td>${isFinite(r.dead) ? r.dead.toPrecision(3) : "ไม่แตะ"}</td>` : '<td colspan="7" class="note">' + r.z.src + "</td>") +
-      `<td>${stat(r)}</td><td>${r.sim ? `<button data-pz="${r.k}">ใช้</button>` : ""}</td></tr>`).join("");
-    const line = (r, label) => r ? `<li><b>${label}: ${r.k}</b> — ${eng(r.V10, "V")} ต่อการกด 10 kPa · dead-zone เมื่อใส่ชั้นนี้ ${r.dead.toPrecision(3)} kPa · ${r.z.route}</li>` : "";
-    $q("#opt-piezo").innerHTML = `<ul class="pzrec">${line(bestP, "ถ้าผลิตด้วย s-gDLP ทุกชั้น")}${line(bestA, "ถ้าไม่จำกัดกระบวนการ")}</ul><p class="note">เกณฑ์: แรงดันสูงสุดในกลุ่มที่ไม่มีตะกั่ว · แถวที่ระบายสีคือคำแนะนำตามตัวกรองด้านบน</p>` +
-      `<table><tr><th>วัสดุของชั้น piezo</th><th>วิธีทำ</th><th>d33 (pC/N)</th><th>εr</th><th>หนา (µm)</th><th>แรงดันที่ 10 kPa</th><th>ประจุที่ 10 kPa</th><th>pyro: 1 K เทียบ 10 kPa</th><th>dead-zone (kPa)</th><th>สถานะ</th><th></th></tr>${body}</table>
-      <p class="note">คำนวณบนโครงสร้างที่ตั้งอยู่ในแผงซ้ายตอนนี้ โดยเปลี่ยนเฉพาะชั้นบนสุดเป็นวัสดุนั้นที่ความหนาตามคอลัมน์ · แรงดัน = d33·p·A ÷ (C ของชั้น + C ของสาย ${P.pz_Ccable_pF} pF) วัสดุที่ εr สูงมาก (เซรามิก) จึงให้ประจุมากแต่แรงดันน้อย · “pyro” คือประจุจากอุณหภูมิเปลี่ยน 1 K หารด้วยประจุจากการกด 10 kPa ยิ่งมากยิ่งถูกอุณหภูมิรบกวน · ค่าคงที่และ ⚠ ของแต่ละวัสดุดูได้โดยเลือกวัสดุนั้นในแผงซ้าย หรือในหน้าความรู้ research_piezo_materials และ research_printable_piezo</p>`;
+    const key = JSON.stringify(Object.assign({}, P, { p_view_kPa: 0, dT_K: 0 })); if (key === pzKey) return; pzKey = key;
+    const rows = piezoRank(P), bestP = piezoPick(rows, true), best = piezoPick(rows, false), eng = (v, u) => typeof fmtSI === "function" ? fmtSI(v, u) : v.toExponential(2) + " " + u;
+    const body = rows.slice().sort((a, b) => (b.sim ? b.V10 : -1) - (a.sim ? a.V10 : -1)).map(r => `<tr class="${r === best ? "hit" : ""}"><td><b>${r.k.replace(" (ไม่มีค่าคงที่)", "")}</b><div class="note">Table 1: ${r.z.tang}</div></td><td>${r.z.route}</td>` +
+      (r.sim ? `<td>${r.z.d33}</td><td>${r.z.er != null ? r.z.er : "—"}</td><td>${r.z.t}</td><td><b>${eng(r.V10, "V")}</b></td><td>${eng(r.Q10, "C")}</td><td>${isFinite(r.dead) ? r.dead.toPrecision(3) : "ไม่แตะ"}</td>` : '<td colspan="6" class="note">—</td>') +
+      `<td class="pzwhy">${piezoReason(r, best, bestP)}</td><td>${r.sim ? `<button data-pz="${r.k}">ใช้</button>` : ""}</td></tr>`).join("");
+    const line = (r, label) => r ? `<li><b>${label}: ${r.k}</b> — ${eng(r.V10, "V")} ต่อการกด 10 kPa · dead-zone เมื่อใส่ชั้นนี้ ${r.dead.toPrecision(3)} kPa</li>` : "";
+    $q("#opt-piezo").innerHTML = `<ul class="pzrec">${line(best, "วัสดุที่เลือก")}</ul>` +
+      `<table><tr><th>วัสดุของชั้น piezo</th><th>วิธีทำ</th><th>d33 (pC/N)</th><th>εr</th><th>หนา (µm)</th><th>แรงดันที่ 10 kPa</th><th>ประจุที่ 10 kPa</th><th>dead-zone (kPa)</th><th>เหตุผลที่เลือก / ไม่เลือก</th><th></th></tr>${body}</table>
+      <p class="note">เกณฑ์เลือก: แรงดันสูงสุดในกลุ่มที่ไม่มีตะกั่ว และไม่ทำให้ dead-zone ของช่อง R กว้างเกิน 3 เท่า · ไม่ได้ใช้กระบวนการผลิตเป็นเกณฑ์ตัดวัสดุ (วิธีทำแสดงไว้เป็นข้อมูล) · คำนวณบนโครงสร้างที่ตั้งอยู่ในแผงซ้าย โดยเปลี่ยนเฉพาะชั้นบนสุดเป็นวัสดุนั้นที่ความหนาตามคอลัมน์ · แรงดัน = d33·p·A ÷ (C ของชั้น + C ของสาย ${P.pz_Ccable_pF} pF) · ค่า pyroelectric และ ⚠ ของแต่ละวัสดุดูได้เมื่อเลือกวัสดุนั้นในแผงซ้าย</p>`;
   }
   function drawScatter() {
     if (!ROWS) return;
@@ -2603,7 +2616,7 @@ const Optimizer = (() => {
       else if (t.dataset.pz) { P.cover_mat = t.dataset.pz; P.cover_um = PH.PIEZO[t.dataset.pz].t; needModel = true; buildControls(); recompute(); renderPiezo(); $q("#opt-status").textContent = `ตั้งชั้นบนสุดเป็น ${t.dataset.pz} แล้ว`; }
     });
   }
-  return { GOALS, SPACE, isPrinted, piezoRank, piezoPick, candidates, applyTo, evaluate, fabScore, normalise, pick, pareto, runSync, resolutionCurve, init, render };
+  return { GOALS, SPACE, isPrinted, piezoRank, piezoPick, piezoReason, candidates, applyTo, evaluate, fabScore, normalise, pick, pareto, runSync, resolutionCurve, init, render };
 })();
 if (typeof module !== "undefined") module.exports = Optimizer;
 </script>
