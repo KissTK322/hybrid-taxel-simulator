@@ -270,6 +270,8 @@ code{background:var(--bg);padding:1px 4px;border-radius:4px}
       <ul>
         <li><b>ลำดับชั้นของ stack</b> (ล่าง→บน): E1 → base PI → dielectric → E2 → cover PI · E1 อยู่ผิวล่างสุดจึงแตะชั้น CNT ของ dome ได้โดยตรง ตรงกับที่ model ช่อง A คิด · ⚠ base PI อยู่ระหว่าง E1 กับ E2 ด้วย แต่ C_B ของ model คิดเฉพาะ dielectric (ไม่รวม PI ที่ต่ออนุกรม) ค่า C_B จริงจึงต่ำกว่า model เล็กน้อย — ตั้ง "PI ที่รองรับ E1" = 0 ถ้า E1 พิมพ์ลงบน dielectric โดยตรง</li>
         <li><b>Large deflection</b>: เมื่อแผ่นบนยุบมากเทียบกับความหนา แผ่นจะยืดและแข็งขึ้น ใช้รูป w_linear = w(1 + β(w/tₑ)²) กับค่าเฉลี่ยของการยุบ โดย tₑ = √(12D/A) (A = ความแข็งแบบยืดรวมของทุกชั้น) · β เป็นค่าของแผ่นขอบยึดแน่นไม่เลื่อน ซึ่งเป็นขอบบนของความแข็ง (border ยางจริงยอมให้ขอบขยับได้บ้าง) · ปิดได้ในหมวด “การคำนวณ”</li>
+        <li><b>border ยุบตัว</b>: border เป็นแถบยาง TPU ที่ยึดสองหน้า รับแรงส่วนที่ dome ไม่ได้รับ ยุบ = (p·a² − ΣF_dome)/k_b โดย k_b = E(1+2S²)A_b/H₀ (Gent–Lindley) ทั้ง stack จึงเลื่อนลงและ dome ที่เตี้ยกว่าแตะตามได้ที่แรงสูง · ปิดได้ในหมวด “การคำนวณ”</li>
+        <li><b>ความต้านทานช่อง A (สมการใหม่)</b>: ต่อ dome = ผิวสัมผัส ρₜ/A_r + กระจายจากวงสัมผัส R_s/8π + ทางเดินบนฟิล์มตามผิว dome · ถ้า E1 เป็น resin-CNT คิดเป็นแผ่นต้านทานและแก้เป็นโครงข่ายด้วย superposition · ρₜ และ film □ fit กับกระแสของ MEMS 2026</li>
         <li><b>ช่อง C (piezo film)</b>: โหมด d33 อย่างเดียว Q = d33·p·A บนพื้นที่ electrode, ไม่รวม d31 จากการดัด · ฟิล์มเป็นแหล่งประจุขนานกับ C ของฟิล์ม + สาย และรั่วผ่าน R ขาเข้า · pyroelectric: Q = p_pyro·A·ΔT · E3 เป็นโลหะบาง</li>
         <li><b>อุณหภูมิ</b>: ปรับ modulus ของ TPU และ dielectric, εr (TCC) และ R ของ CNT (TCR) แบบเส้นตรงตาม ΔT · calibration อยู่ที่ ΔT = 0 · ไม่รวมการขยายตัวตามความร้อน (gap 30 µm เปลี่ยนน้อยกว่า 0.1 µm ต่อ 10 K เพราะ border กับ dome เป็น TPU เดียวกัน)</li>
         <li><b>noise</b>: noise ของชิปอ่าน C รวมกับ noise ของระบบจริง (ค่าเริ่มต้น 1 fF ⚠) แบบ root-sum-square</li>
@@ -477,7 +479,10 @@ function geometry(P) {
   const hmax = Math.max(hs.c, hs.e, hs.k);
   const H0 = hmax + P.gap_um * 1e-6;                // E1 underside height above floor at rest
   domes.forEach(d => d.g = H0 - d.h);               // initial gap of each dome tip
-  return { a, L, rb, pit, domes, H0, hmax };
+  // border frame as a bonded rubber strip in compression: k_b = E (1 + 2 S^2) A_b / H0, S = width / (2 height)
+  const bw = P.border_mm * 1e-3, Ab = a * a - L * L, Sb = bw / (2 * H0);
+  const kb = P.border_sink === "off" ? Infinity : P.E_tpu_MPa * 1e6 * (1 + 2 * Sb * Sb) * Ab / H0;
+  return { a, L, rb, pit, domes, H0, hmax, Ab, kb, cb: P.border_sink === "off" ? 0 : a * a / kb };   // cb = sink per unit pressure if no dome carries load
 }
 
 // ---------------------------------------------------------------- top stack
@@ -605,8 +610,10 @@ function solve9(J, b) {               // small dense Gaussian elimination
 }
 // Contact problem at pressure p (Pa). Es = effective modulus of dome contact.
 function solveDomes(p, G, PF, Es, warm, kappa) {
-  const m = G.domes.length, kp = kappa || 1;
-  if (kp !== 1) PF = { wp: PF.wp.map(v => v / kp), Gm: PF.Gm.map(r => r.map(v => v / kp)) };
+  const m = G.domes.length, kp = kappa || 1, ib = G.kb && isFinite(G.kb) ? 1 / G.kb : 0;
+  // The border carries the load the domes do not: sink = (p a^2 - sum F) / k_b. It moves the whole stack down
+  // rigidly, so it adds a^2 / k_b to every pressure compliance and 1 / k_b to every dome-to-dome compliance.
+  if (kp !== 1 || ib) PF = { wp: PF.wp.map(v => v / kp + G.a * G.a * ib), Gm: PF.Gm.map(r => r.map(v => v / kp + ib)) };
   let d = warm ? warm.slice() : G.domes.map((dm, j) => p * PF.wp[j] - dm.g);
   for (let it = 0; it < 80; it++) {
     const f = d.map((x, j) => hertz(x, Es, G.domes[j].R));
@@ -623,7 +630,8 @@ function solveDomes(p, G, PF, Es, warm, kappa) {
   }
   const force = d.map((x, j) => hertz(x, Es, G.domes[j].R));
   const a = d.map((x, j) => x > 0 ? Math.sqrt(G.domes[j].R * x) : 0);
-  return { delta: d, force, a, nContact: d.filter(x => x > 0).length, kappa: kp };
+  const sink = ib ? Math.max(0, (p * G.a * G.a - force.reduce((s, f) => s + f, 0)) * ib) : 0;
+  return { delta: d, force, a, nContact: d.filter(x => x > 0).length, kappa: kp, sink };
 }
 // Contact solve with the large-deflection correction. Linear plate theory holds only while the
 // deflection is small against the thickness; beyond that the plate also stretches. We use the classic
@@ -676,11 +684,11 @@ function capA(p, G, PF, sol, P) {
       for (let k = 0; k < c.Wk.length; k++) c.Wk[k][q] = PF.at(PF.wPt[k], x, y);
     }
   }
-  const n = m * m, F = sol.force, kp = sol.kappa || 1; let s = 0;
+  const n = m * m, F = sol.force, kp = sol.kappa || 1, sink = sol.sink || 0; let s = 0;
   for (let q = 0; q < n; q++) {
     let w = p * c.Wp[q];
     for (let k = 0; k < F.length; k++) if (F[k] > 0) w -= F[k] * c.Wk[k][q];
-    s += dA / Math.max(gmin, G.H0 - w / kp - c.ds[q]);
+    s += dA / Math.max(gmin, G.H0 - sink - w / kp - c.ds[q]);
   }
   return EPS0 * s;
 }
@@ -709,9 +717,22 @@ function resistanceA(sol, G, P, rho) {
     const R = Rc + Rpath; gsum += 1 / R; parts[j] = { Rc, Rpath }; return R;
   });
   const Rpad = (rho / tf) * P.film_sq;
-  const Ron = gsum > 0 ? 1 / gsum + Rpad : Infinity;
+  // E1 as a resistive sheet (printed resin-CNT electrode): current injected at dome j raises the sheet potential at
+  // dome k by (Rs1 / 2 pi) ln(re / d_jk) (ring collector at radius re = L/2), and at itself by
+  // Rs1 / (8 pi) + (Rs1 / 2 pi) ln(re / a_j). All contacting domes sit at the same terminal voltage: solve M I = 1.
+  const e1 = ELECTRODES[P.e1_type], Rs1 = P.r_model === "legacy" ? 0 : (e1.Rs != null ? e1.Rs : rho / (e1.t_um * 1e-6));
+  let Rnet = gsum > 0 ? 1 / gsum : Infinity, Re1 = 0;
+  const on = perDome.map((r, j) => isFinite(r) ? j : -1).filter(j => j >= 0);
+  if (on.length && Rs1 > 1) {
+    const re = G.L / 2, k2 = Rs1 / (2 * Math.PI);
+    const Mx = on.map(j => on.map(k => j === k ? perDome[j] + Rs1 / (8 * Math.PI) + k2 * Math.log(re / Math.min(sol.a[j], 0.9 * re))
+      : k2 * Math.max(0, Math.log(re / Math.hypot(G.domes[j].x - G.domes[k].x, G.domes[j].y - G.domes[k].y)))));
+    const I = solve9(Mx, on.map(() => 1)), It = I.reduce((s, v) => s + v, 0);
+    Re1 = 1 / It - Rnet; Rnet = 1 / It;
+  }
+  const Ron = gsum > 0 ? Rnet + Rpad : Infinity;
   const R = 1 / ((isFinite(Ron) ? 1 / Ron : 0) + 1 / P.R_leak);
-  return { R, Ron, perDome, Rpad, parts };   // parts = per-dome breakdown for display only
+  return { R, Ron, perDome, Rpad, parts, Re1 };   // parts = per-dome breakdown for display only; Re1 = extra resistance from the E1 sheet
 }
 
 // ---------------------------------------------------------------- channel B
@@ -766,8 +787,8 @@ function sweep(model, opts = {}) {
   const tab = dielectricTable(P);
   const out = [];
   let warm = null, firstContact = null;
-  let onset0 = Math.min(...G.domes.map((d, j) => d.g / PF.wp[j]));     // linear-plate estimate
-  if (P.large_defl !== "off" && P.beta_ld > 0) {
+  let onset0 = Math.min(...G.domes.map((d, j) => d.g / (PF.wp[j] + G.cb)));     // linear-plate estimate (plate + border sink)
+  if (P.large_defl !== "off" && P.beta_ld > 0 && isFinite(onset0)) {
     // with stiffening the first contact comes later: bracket it upward from the linear estimate, then bisect
     const hit = q => solveContact(q, G, PF, Es, null, P).nContact > 0;
     let lo = onset0 * 0.999, hi = onset0;
@@ -915,8 +936,8 @@ const DEFAULTS = {
   // top capacitive stack
   cover_um: 25, e2_type: "Copper (FPC)", diel_mat: "PDMS Sylgard 184", diel_um: 100, porosity: 0.5,
   e1_type: "Copper (FPC)", base_um: 25, stack_bond: "independent", elec_frac: 1.0,
-  // electrical (rho_t fitted to the MEMS 2026 current law over 5-100 kPa, see briefing section 17)
-  rho_t: 3e-3, H_asp_MPa: 2, film_sq: 0.16, r_model: "film", R_leak: 5e9, C_par_pF: 1.0,
+  // electrical (rho_t and film_sq fitted to the MEMS 2026 current law over 5-1500 kPa, see briefing section 17)
+  rho_t: 2e-3, H_asp_MPa: 2, film_sq: 0.02, r_model: "film", R_leak: 5e9, C_par_pF: 1.0,
   TCR: -0.1, TCC: -0.18, drift_pct: 5.8,   // sourced in knowledge/research_temperature_stability.md
   creep_tpu: 10, tau_tpu_min: 5, creep_diel: 10, tau_diel_min: 5,
   // readout
@@ -925,7 +946,7 @@ const DEFAULTS = {
   mcu_clk_MHz: 16, R_charge_k: 1000, lockin_noise_fF: 1, f_exc_kHz: 100, lockin_periods: 10,
   rows: 16, cols: 9, t_adc_us: 20,
   // large-deflection correction (membrane stiffening); beta from knowledge/research_mechanics_materials.md
-  large_defl: "on", beta_ld: 0.52,
+  large_defl: "on", beta_ld: 0.52, border_sink: "on",
   // piezo film option (channel C) and temperature
   cover_mat: "Polyimide (PI)", pz_Rin_MOhm: 100, pz_Ccable_pF: 50,
   dT_K: 0, kE_tpu: -1.0, c_env_fF: 1,
@@ -950,7 +971,7 @@ const Viz3D = (() => {
   let host, ov, renderer, scene, camera, root, clipPlane;
   let M = null, P = null, G = null, st = null;
   let groups = {}, clipMats = [], stack = [], caps = {}, domes = [], patches = [], labels = [];
-  let gridF = null, secF = null, wg = null, ws = null, secX = null, arrows = [];
+  let gridF = null, secF = null, wg = null, ws = null, secX = null, arrows = [], borders = [], borderH = 1;
   const opt = { exag: 3, explode: false, e: 0, section: true, labels: true };
   const cam = { th: -0.6, ph: 0.98, r: 10.5, tx: 0, ty: 0.45, tz: 0 };
   let dirty = true, running = false;
@@ -1072,8 +1093,9 @@ const Viz3D = (() => {
     const gt = grp("tpu");
     gt.add(box(a, a, fl - ct, 0, 0, -ct - (fl - ct) / 2, tpuM));
     const hb = H0 + ct, zc = -ct + hb / 2;
-    gt.add(box(a, b, hb, 0, a / 2 - b / 2, zc, tpuM), box(a, b, hb, 0, -a / 2 + b / 2, zc, tpuM),
-           box(b, L, hb, a / 2 - b / 2, 0, zc, tpuM), box(b, L, hb, -a / 2 + b / 2, 0, zc, tpuM));
+    borders = [box(a, b, hb, 0, a / 2 - b / 2, zc, tpuM), box(a, b, hb, 0, -a / 2 + b / 2, zc, tpuM),
+               box(b, L, hb, a / 2 - b / 2, 0, zc, tpuM), box(b, L, hb, -a / 2 + b / 2, 0, zc, tpuM)];
+    borders.forEach(m => gt.add(m)); borderH = hb;
     caps.tpu = makeStrip(); gt.add(new THREE.Mesh(caps.tpu.geo, capMat(COLS.tpu)));
     labels.push({ key: "tpu", name: "TPU: พื้น + dome + border", t: null, z: H0 / 2, color: COLS.tpu, note: `border ${(G.H0 * 1e6).toFixed(0)} µm` });
 
@@ -1121,9 +1143,11 @@ const Viz3D = (() => {
   function update(state) {
     st = state;
     if (!renderer || !M) return;
-    const p = st.p, F = st.sol.force, H0 = G.H0 * MM, ct = P.cnt_t_um * 1e-3, fl = P.tpu_floor_um * 1e-3, half = G.L / 2;
+    const sinkM = st.sol.sink || 0, Hs = G.H0 - sinkM;            // border compressed: the whole stack sits lower
+    const p = st.p, F = st.sol.force, H0 = Hs * MM, ct = P.cnt_t_um * 1e-3, fl = P.tpu_floor_um * 1e-3, half = G.L / 2;
     const kp = st.sol.kappa || 1, Fk = kp === 1 ? F : F.map(f => f / kp), pk = p / kp;   // large-deflection stiffening
     evalW(gridF, pk, Fk, wg); evalW(secF, pk, Fk, ws);
+    borders.forEach(m => { const s = (H0 + ct) / borderH; m.scale.z = s; m.position.z = -ct + borderH * s / 2; });
     // stack
     let zb = H0;
     stack.forEach(l => {
@@ -1143,15 +1167,15 @@ const Viz3D = (() => {
     const fmax = Math.max(1e-12, ...F);
     domes.forEach((D, j) => {
       const d = G.domes[j]; evalW(D.F, pk, Fk, D.w);
-      for (let k = 0; k < D.nv; k++) D.pos[3 * k + 2] = Math.min(d.h * (1 - D.r2[k]), G.H0 - D.w[k]) * MM;
+      for (let k = 0; k < D.nv; k++) D.pos[3 * k + 2] = Math.min(d.h * (1 - D.r2[k]), Hs - D.w[k]) * MM;
       D.geo.attributes.position.needsUpdate = true; D.geo.computeVertexNormals();
       const on = F[j] > 0;
       D.cntMat.emissiveIntensity = on ? 0.45 + 0.55 * F[j] / fmax : 0;
       const pm = patches[j]; pm.visible = on && st.sol.a[j] > 0;
-      if (pm.visible) { const r = st.sol.a[j] * MM; pm.scale.set(r, r, 1); pm.position.z = (G.H0 - D.w[0]) * MM + 0.004; }
+      if (pm.visible) { const r = st.sol.a[j] * MM; pm.scale.set(r, r, 1); pm.position.z = (Hs - D.w[0]) * MM + 0.004; }
     });
     // cut faces of the printed layer
-    const prof = i => { const x = secX[i]; return Math.abs(x) >= half ? 0 : Math.min(Physics.domeSurface(x, 0, G), G.H0 - ws[i]) * MM; };
+    const prof = i => { const x = secX[i]; return Math.abs(x) >= half ? 0 : Math.min(Physics.domeSurface(x, 0, G), Hs - ws[i]) * MM; };
     caps.tpu.set(() => -fl, i => Math.abs(secX[i]) >= half ? H0 : prof(i) - ct);
     caps.cnt.set(i => Math.abs(secX[i]) >= half ? 0 : prof(i) - ct, i => Math.abs(secX[i]) >= half ? 0 : prof(i));
     requestRender();
@@ -1293,9 +1317,9 @@ const SPEC = [
     ["t_perc", "exponent t ของ percolation", "", 1.3, 3, 0.05, 0, "ทฤษฎี percolation 3D ≈ 2 (ไม่ได้มาจาก paper)"],
     ["sigma0", "σ₀ ของ percolation", "S/m", 100, 1e4, 10, 1, "fit ให้ 5 wt% ≈ 4×10⁻³ S/cm (อ่านจากกราฟ AFM 2025 Fig. 2I; ข้อความ p.6 เขียน ≈10⁻³)"],
     ["r_model", "model ของ R บน dome", "sel", ["film", "legacy"]],
-    ["rho_t", "ความต้านทานของผิวสัมผัส ρₜ (interface)", "Ω·m²", 1e-6, 1, 1e-6, 1, "fit ให้กระแสตรงกับ MEMS 2026 (I = I₀(1+296.5P)) ช่วง 5–100 kPa ด้วยชุดโลหะบาง: rms 0.12 decade · ต้อง fit ใหม่กับค่าวัดจริง"],
+    ["rho_t", "ความต้านทานของผิวสัมผัส ρₜ (interface)", "Ω·m²", 1e-6, 1, 1e-6, 1, "fit ให้กระแสตรงกับ MEMS 2026 (I = I₀(1+296.5P)) ช่วง 5–1500 kPa ด้วยชุดโลหะบาง: อยู่ในช่วง 0.4–2.4 เท่า · ต้อง fit ใหม่กับค่าวัดจริง"],
     ["H_asp_MPa", "hardness ของ asperity ผิว", "MPa", 0.2, 20, 0.1, 1, "⚠ ไม่มีใน paper — ควบคุมพื้นที่สัมผัสจริง A = F/H ต้องวัด"],
-    ["film_sq", "จำนวน square ของ film ถึง pad", "□", 0.02, 3, 0.01, 0, "ปรับให้ R ของ film ≈ 20.53 kΩ (AFM 2025 Fig. 6C, two-point probe)"],
+    ["film_sq", "จำนวน square ของ film ถึง pad", "□", 0.02, 3, 0.01, 0, "fit กับกระแสของ MEMS 2026: ต้องเล็ก (≈0.02) · ค่า 0.16 ที่ให้ 20 kΩ ตาม AFM 2025 Fig. 6C ทำให้กระแสที่ 1000 kPa ต่ำเกิน 3 เท่า (เป็นการวัดคนละแบบ) ⚠ ตำแหน่งขั้วจริงต้องยืนยัน"],
     ["R_leak", "R รั่วตอนไม่แตะ", "Ω", 1e7, 1e11, 1e7, 1, "I₀ ≈ 10⁻⁹ A ที่ 5 V (AFM 2025 Fig. 3F; MEMS 2026 p.3)"],
   ]],
   ["Stack ด้านบน (วงจร B: E1–E2)", [
@@ -1357,13 +1381,14 @@ const SPEC = [
   ]],
   ["การคำนวณ", [
     ["large_defl", "แผ่นบนยืดตัวเมื่อยุบมาก (large deflection)", "sel", ["on", "off"]],
+    ["border_sink", "border ยุบตัวเมื่อรับแรง", "sel", ["on", "off"]],
     ["beta_ld", "สัมประสิทธิ์ β ของ large deflection", "", 0, 2, 0.01, 0, "w_linear = w(1 + β(w/tₑ)²) · 0.52 = fit กับ Levy, NACA Report 740 Table 5 (แผ่นสี่เหลี่ยมขอบยึดแน่น, w/t ≤ 1.9) · แผ่นกลม 0.488 (Timoshenko) · เกิน w/t ≈ 2 เป็นการ extrapolate"],
     ["p_max_kPa", "แรงกดสูงสุดของกราฟ", "kPa", 20, 2000, 10, 1, ""],
     ["fd_n", "ความละเอียด FD ของแผ่นบน", "จุด/ด้าน", 13, 33, 2, 0, "มาก = แม่นขึ้นแต่ช้าลง"],
     ["ca_grid", "ความละเอียดการคำนวณ C_A", "จุด/ด้าน", 40, 160, 10, 0, ""],
   ]],
 ];
-const HEAVY = new Set(["taxel_mm", "border_mm", "dome_d_um", "pitch_um", "h_center_um", "h_edge_um", "h_corner_um", "gap_um", "cover_um", "e2_type", "diel_mat", "diel_um", "porosity", "e1_type", "base_um", "stack_bond", "fd_n", "cover_mat", "large_defl", "beta_ld"]);
+const HEAVY = new Set(["taxel_mm", "border_mm", "dome_d_um", "pitch_um", "h_center_um", "h_edge_um", "h_corner_um", "gap_um", "cover_um", "e2_type", "diel_mat", "diel_um", "porosity", "e1_type", "base_um", "stack_bond", "fd_n", "cover_mat", "large_defl", "beta_ld", "border_sink", "E_tpu_MPa", "border_mm"]);
 
 // ------------------------------------------------------------- helpers
 const $ = s => document.querySelector(s);
@@ -1384,7 +1409,7 @@ const PRESETS = {
   "โลหะบาง + piezo PVDF 28 µm (3 ช่อง)": { e1_type: "Sputtered Cu (thin)", e2_type: "Sputtered Cu (thin)", base_um: 12.5, cover_mat: "PVDF film (piezo)", cover_um: 28 },
   "พิมพ์ทุกชั้นด้วย s-gDLP: electrode resin-CNT + dielectric TPU พรุน": { e1_type: "Resin-CNT (print)", e2_type: "Resin-CNT (print)", base_um: 0, cover_um: 0, diel_mat: "TPU resin (DLP)", porosity: 0.5 },
   "พิมพ์ทุกชั้น + ชั้น piezo resin-BaTiO₃ (3 ช่อง)": { e1_type: "Resin-CNT (print)", e2_type: "Resin-CNT (print)", base_um: 0, diel_mat: "TPU resin (DLP)", porosity: 0.5, cover_mat: "Resin + BaTiO3 (print)", cover_um: 30 },
-  "model เดิม (ไม่คิด large deflection, noise ชิปอย่างเดียว, R แบบเก่า)": { large_defl: "off", c_env_fF: 0, r_model: "legacy", rho_t: 1e-5 },
+  "ideal: model เดิม (แผ่นเส้นตรง, border แข็ง, noise ชิปอย่างเดียว, R แบบเก่า)": { large_defl: "off", c_env_fF: 0, r_model: "legacy", rho_t: 1e-5, film_sq: 0.16, border_sink: "off" },
 };
 function applyFilter() {
   const q = PSEARCH.trim().toLowerCase();
@@ -1587,7 +1612,7 @@ function tabCNT() {
     <tr><td>สัดส่วนปริมาตร CNT</td><td>${(c.phi * 100).toFixed(2)} vol%</td></tr>
     <tr><td>conductivity σ</td><td>${(c.sigma / 100).toExponential(2)} S/cm</td></tr>
     <tr><td>sheet resistance (หนา ${P.cnt_t_um} µm)</td><td>${fmtSI(Rs, "Ω/□")}</td></tr>
-    <tr><td>R ของ film ถึง pad (${P.film_sq} □)</td><td>${fmtSI(Rs * P.film_sq, "Ω")} <span class="note">(AFM 2025 Fig. 6C วัดได้เฉลี่ย 20.53 kΩ, CV 13.26 %)</span></td></tr>
+    <tr><td>R ของ film ถึง pad (${P.film_sq} □)</td><td>${fmtSI(Rs * P.film_sq, "Ω")} <span class="note">(ค่า fit กับกระแสของ MEMS 2026 · AFM 2025 Fig. 6C วัด two-point ได้ 20.53 kΩ ซึ่งเป็นการวัดคนละแบบ)</span></td></tr>
     <tr><td>Dp ของ resin-CNT</td><td>${pr.Dp.toFixed(1)} µm</td></tr>
     <tr><td>เวลาฉายเพื่อให้ได้ ${P.cnt_t_um} µm</td><td>${pr.tNeed.toFixed(0)} s</td></tr></table>
     <h4>Grayscale ที่ต้องใช้สำหรับ dome แต่ละความสูง (ฉาย ${P.t_exp_tpu} s ครั้งเดียว)</h4>
@@ -1831,7 +1856,7 @@ const Stage = (() => {
   function drawStory() {
     const st = LIVE, G = MODEL.G, n = st.sol.nContact, hmax = Math.max(...G.domes.map(d => d.h));
     const tier1 = G.domes.filter(d => d.h === hmax).length, strain = Math.max(...st.sol.delta.map((d, j) => d / G.domes[j].h));
-    const gapC = Math.max(0, G.H0 - PH.deflectionAt(0, 0, st.p, MODEL.PF, st.sol) - hmax) * 1e6;
+    const gapC = Math.max(0, G.H0 - (st.sol.sink || 0) - PH.deflectionAt(0, 0, st.p, MODEL.PF, st.sol) - hmax) * 1e6;
     const step = strain > 0.3 ? 4 : n > tier1 ? 3 : n > 0 ? 2 : st.p > 300 ? 1 : 0;
     const names = ["ยังไม่กด", "① ก่อนแตะ: dead-zone ของ R", "② dome แรกแตะ: สวิตช์ปิด", "③ dome ระดับถัดไปแตะ", "④ เกินช่วงที่ model เชื่อได้"];
     const j0 = st.sol.force.indexOf(Math.max(...st.sol.force));
@@ -1844,6 +1869,8 @@ const Stage = (() => {
     ][step];
     const extra = [];
     if (st.sol.kappa > 1.15) extra.push(`แผ่นบนแข็งขึ้น ×${st.sol.kappa.toFixed(1)} เพราะยืดตัว`);
+    if (st.sol.sink > 2e-6) extra.push(`border ยุบ ${(st.sol.sink * 1e6).toFixed(0)} µm`);
+    if (st.RA.Re1 > 100) extra.push(`ความต้านทานของ E1 เพิ่ม ${fmtSI(st.RA.Re1, "Ω")}`);
     if (pz.S) extra.push(`piezo ตอบเฉพาะตอนแรงเปลี่ยน: ${fmtSI(pz.V, "V")}`);
     if (P.dT_K) extra.push(`ΔT ${P.dT_K > 0 ? "+" : ""}${P.dT_K} K: ค่าที่อ่านคลาดจาก calibration`);
     $("#story").innerHTML = `<div class="steps">${names.map((s, i) => `<span class="${i === step ? "on" : i < step ? "done" : ""}${i === 4 ? " warnstep" : ""}">${s}</span>`).join("")}</div><div class="say">${txt}${extra.length ? ' <span class="note">· ' + extra.join(" · ") + "</span>" : ""}</div>`;
@@ -1923,16 +1950,17 @@ const Stage = (() => {
     const zTop = G.H0 + Ls.reduce((s, l) => s + l.t, 0) + 40e-6, zBot = sec.zoom ? G.hmax - 260e-6 : -(fl + pd);
     const sx = (W - ml - mr) / G.a, sz = (H - mt - mb) / (zTop - zBot);
     const X = x => ml + (x + G.a / 2) * sx, Y = z => mt + (zTop - z) * sz;
+    const sink = st.sol.sink || 0, Hs = G.H0 - sink;                // border compressed: stack sits lower
     const wAt = x => Math.abs(x) >= half ? 0 : PH.deflectionAt(x, 0, st.p, PF, st.sol);
     const N = Math.max(120, Math.round((W - ml - mr) / 2)), xs = [], wv = [], pr = [];
-    for (let i = 0; i <= N; i++) { const x = -G.a / 2 + G.a * i / N, w = wAt(x); xs.push(x); wv.push(w); pr.push(Math.abs(x) >= half ? 0 : Math.min(PH.domeSurface(x, 0, G), G.H0 - w)); }
-    const under = i => G.H0 - wv[i];                              // underside of the stack
+    for (let i = 0; i <= N; i++) { const x = -G.a / 2 + G.a * i / N, w = wAt(x); xs.push(x); wv.push(w); pr.push(Math.abs(x) >= half ? 0 : Math.min(PH.domeSurface(x, 0, G), Hs - w)); }
+    const under = i => Hs - wv[i];                              // underside of the stack
     c.save(); c.beginPath(); c.rect(ml, mt, W - ml - mr, H - mt - mb); c.clip();
     // PDMS, TPU floor, border, dome bodies
     c.fillStyle = "#9FB4C0"; c.fillRect(X(-G.a / 2), Y(-fl), G.a * sx, pd * sz);
     c.fillStyle = "#EFD9A0"; c.fillRect(X(-G.a / 2), Y(0), G.a * sx, fl * sz);
     const bw = (G.a - G.L) / 2 * sx;
-    c.fillRect(X(-G.a / 2), Y(G.H0), bw, G.H0 * sz); c.fillRect(X(half), Y(G.H0), bw, G.H0 * sz);
+    c.fillRect(X(-G.a / 2), Y(Hs), bw, Hs * sz); c.fillRect(X(half), Y(Hs), bw, Hs * sz);
     c.beginPath(); c.moveTo(X(-half), Y(0)); for (let i = 0; i <= N; i++) if (Math.abs(xs[i]) <= half) c.lineTo(X(xs[i]), Y(pr[i])); c.lineTo(X(half), Y(0)); c.closePath(); c.fill();
     // air gap: local capacitance density eps0 / gap (channel A)
     const gmin = 0.5e-6, dLo = PH.EPS0 / G.H0, dHi = PH.EPS0 / 2e-6;
@@ -1996,7 +2024,7 @@ const Stage = (() => {
     const text = (s, x, y, color, bold) => { c.font = `${bold ? "700 " : ""}12px -apple-system, 'Sarabun', sans-serif`; c.fillStyle = color; c.fillText(s, x, y); };
     text(`ภาพตัดที่ y = 0 · แนวดิ่ง ×${(sz / sx).toFixed(1)}${sec.zoom ? " (ซูมบริเวณ gap)" : ""} · แรงกด ${kPa(st.p)}`, ml, 16, mut);
     if (!narrow) {
-      const yE1 = Y(G.H0 + e1z), yE2 = Y(G.H0 + (zOf.E2[0] + zOf.E2[1]) / 2);
+      const yE1 = Y(Hs + e1z), yE2 = Y(Hs + (zOf.E2[0] + zOf.E2[1]) / 2);
       c.strokeStyle = COL.cap; c.lineWidth = 1.2; c.beginPath(); c.moveTo(X(-G.a / 2), yE2); c.lineTo(ml - 14, yE2); c.moveTo(X(-G.a / 2), yE1); c.lineTo(ml - 14, yE1); c.stroke();
       c.textAlign = "right"; text("E2", ml - 18, yE2 + 4, cssv("--cap-t"), 1); text("E1", ml - 18, yE1 + 12, cssv("--hyb-t"), 1); c.textAlign = "left";
       let y = Math.max(48, yE1 + 34);
@@ -2005,7 +2033,7 @@ const Stage = (() => {
       text(`εr,eff = ${st.CB.er.toFixed(2)}`, 8, y += 16, mut);
       if (pz.S) { text("ช่อง C (piezo, E2–E3)", 8, 34, cssv("--pzo-t"), 1); }
       y += 26; text("gap ของวงจร A", 8, y, cssv("--pzr-t"), 1);
-      const gc = G.H0 - wAt(0) - PH.domeSurface(0, 0, G);
+      const gc = Hs - wAt(0) - PH.domeSurface(0, 0, G);
       text(`เหนือ dome กลาง ${(Math.max(0, gc) * 1e6).toFixed(1)} µm`, 8, y += 16, ink);
       text(`C_A = ${fmtPF(st.CA)}`, 8, y += 16, ink); text(st.sol.nContact ? "(ถูก R short แล้ว)" : "(ใช้งานได้ — ยังไม่แตะ)", 8, y += 16, mut);
       const xr = W - mr + 12; y = 48;
@@ -2015,6 +2043,7 @@ const Stage = (() => {
         y += 8; marks.forEach(m => { const pt = st.RA.parts[m.j], nm = m.d.x < -1e-9 ? "ซ้าย" : m.d.x > 1e-9 ? "ขวา" : "กลาง";
           text(`dome ${nm} · I = ${fmtSI(m.Ij, "A")}`, xr, y += 17, cssv("--pzr-t"), 1); text(`① R_contact ${fmtSI(pt.Rc, "Ω")}`, xr, y += 15, ink); text(`② R_path ${fmtSI(pt.Rpath, "Ω")}`, xr, y += 15, ink); });
         text(`③ R_pad ${fmtSI(st.RA.Rpad, "Ω")}`, xr, y += 19, ink);
+        if (st.RA.Re1 > 100) text(`+ แผ่น E1 ${fmtSI(st.RA.Re1, "Ω")}`, xr, y += 15, ink);
         const others = st.sol.nContact - marks.length; if (others > 0) text(`+ dome นอกภาพตัด ${others} ลูก`, xr, y += 15, mut);
         text("จุดวิ่ง: ความเร็ว/ความถี่ ∝ log I", xr, y += 17, mut);
       } else { text("ยังไม่มี dome แตะ", xr, y += 22, mut); text(`เหลือ R รั่ว ${fmtSI(P.R_leak, "Ω")}`, xr, y += 15, mut); }
