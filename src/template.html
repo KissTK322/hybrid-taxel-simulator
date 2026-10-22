@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hybrid Taxel Simulator</title>
+<style>
+:root{--bg:#F4F6F7;--card:#FFFFFF;--ink:#1B2430;--muted:#5B6470;--line:#D5DBDF;--grid:#E6EAEC;--pzr:#C8742B;--cap:#0F7C7A;--hyb:#5B4B8A;--red:#B23A3A;--good:#1E7B4A;--pzr-t:#C8742B;--cap-t:#0F7C7A;--hyb-t:#5B4B8A;--pzo:#2F6FB0;--pzo-t:#2F6FB0}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#12181F;--card:#1A222C;--ink:#E6EBEF;--muted:#9AA6B2;--line:#2C3845;--grid:#24303B;--pzr-t:#E39A55;--cap-t:#45B8B3;--hyb-t:#A898DE;--pzo-t:#7FB2EA;--red:#E06A6A;--good:#4CC38A}}
+:root[data-theme="dark"]{--bg:#12181F;--card:#1A222C;--ink:#E6EBEF;--muted:#9AA6B2;--line:#2C3845;--grid:#24303B;--pzr-t:#E39A55;--cap-t:#45B8B3;--hyb-t:#A898DE;--pzo-t:#7FB2EA;--red:#E06A6A;--good:#4CC38A}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 -apple-system,BlinkMacSystemFont,"Sarabun","Thonburi","Segoe UI",sans-serif}
+header{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 18px;background:var(--card);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+header h1{font-size:17px;margin:0 8px 0 0}
+header .sub{color:var(--muted);font-size:12.5px}
+header .sp{flex:1}
+button,.btn{background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:7px;padding:6px 11px;font:inherit;font-size:13px;cursor:pointer}
+button:hover,.btn:hover{border-color:var(--hyb)}
+button.primary{background:var(--hyb);color:#fff;border-color:var(--hyb)}
+.wrap{display:grid;grid-template-columns:360px 1fr;gap:14px;padding:14px;align-items:start}
+@media (max-width:900px){.wrap{grid-template-columns:1fr} aside{position:static;max-height:340px}}
+aside{background:var(--card);border:1px solid var(--line);border-radius:10px;max-height:calc(100vh - 90px);overflow:auto;position:sticky;top:72px}
+details{border-bottom:1px solid var(--line)}
+summary{padding:10px 14px;font-weight:600;cursor:pointer;list-style:none}
+summary::before{content:"▸ ";color:var(--muted)} details[open] summary::before{content:"▾ "}
+.prow{padding:4px 14px 8px}
+.prow label{display:block;font-size:12.5px;color:var(--ink)}
+.prow .src{color:var(--muted);cursor:help}
+.pin{display:flex;gap:6px;align-items:center}
+.pin input[type=range]{flex:1;accent-color:var(--hyb)}
+.pin input[type=number]{width:82px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;padding:2px 5px;font:inherit;font-size:12.5px}
+.pin .u{width:46px;font-size:11.5px;color:var(--muted)}
+select{width:100%;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;padding:4px;font:inherit;font-size:12.5px}
+.note{font-size:11.5px;color:var(--muted)}
+main{min-width:0}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:14px}
+.pv{display:flex;align-items:center;gap:10px;margin-top:6px}
+.pv{align-items:flex-start} .pv b{padding-top:1px}
+.pv input[type=number]{width:90px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;padding:3px 6px}
+#kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(122px,1fr));gap:8px;margin-top:10px}
+.kpi{border:1px solid var(--line);border-radius:8px;padding:7px 10px}
+.kpi .k{font-size:11.5px;color:var(--muted)} .kpi .v{font-size:18px;font-weight:700} .kpi .s{font-size:11px;color:var(--muted)}
+.kpi.pzr .v{color:var(--pzr-t)} .kpi.cap .v{color:var(--cap-t)} .kpi.hyb .v{color:var(--hyb-t)}
+.warn{margin-top:6px;padding:6px 10px;border-radius:6px;background:rgba(178,58,58,.1);color:var(--red);font-size:12.5px}
+.tabs{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px}
+.tab{border-radius:7px 7px 0 0;border-bottom:none}
+.tab.on{background:var(--hyb);color:#fff;border-color:var(--hyb)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:1200px){.grid2{grid-template-columns:1fr}}
+.ch{position:relative;height:300px;border:1px solid var(--line);border-radius:8px;background:var(--card)}
+.ch canvas{display:block}
+.chart-tip{position:absolute;display:none;pointer-events:none;background:var(--card);border:1px solid var(--line);border-radius:6px;padding:5px 8px;font-size:12px;box-shadow:0 2px 8px rgba(0,0,0,.12);min-width:150px}
+table{border-collapse:collapse;width:100%;font-size:12.5px;margin:6px 0}
+th,td{border-bottom:1px solid var(--line);padding:5px 7px;text-align:left;vertical-align:top}
+th{color:var(--muted);font-weight:600}
+tr.hit td{background:rgba(200,116,43,.12)}
+.good{color:var(--good);font-weight:700} .bad{color:var(--red);font-weight:700}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:14px} @media (max-width:1100px){.two{grid-template-columns:1fr}}
+h3{margin:4px 0 8px;font-size:15px} h4{margin:12px 0 4px;font-size:13.5px}
+.trow{display:flex;gap:12px;flex-wrap:wrap;align-items:end;margin-bottom:10px}
+.trow label{font-size:12px;color:var(--muted);display:flex;flex-direction:column}
+.trow input{width:90px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;padding:3px 6px}
+#heat{width:240px;height:240px;image-rendering:pixelated;border:1px solid var(--line);border-radius:6px}
+.about li{margin-bottom:5px}
+#status{font-size:11.5px;color:var(--muted)}
+code{background:var(--bg);padding:1px 4px;border-radius:4px}
+
+.stagebar{display:flex;gap:10px 16px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{border:none;border-radius:0;border-right:1px solid var(--line);padding:6px 12px}
+.seg button:last-child{border-right:none}
+.seg button.on{background:var(--hyb);color:#fff}
+.vopts{display:flex;gap:6px 14px;flex-wrap:wrap;align-items:center;font-size:12.5px}
+.vopts label,.transport label{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.vopts input[type=range]{width:110px;accent-color:var(--hyb)} .vopts select{width:auto}
+#stage{position:relative;height:392px;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--bg)}
+#stage .view{position:absolute;inset:0}
+#three-host,#three-ov,#sec-cv,#cir-svg{position:absolute;inset:0;width:100%;height:100%;display:block}
+#three-ov{pointer-events:none}
+#arr-cv{display:block;width:100%;height:296px;cursor:crosshair;touch-action:none}
+#arr-info{padding:2px 12px;line-height:1.5}
+.vhint{position:absolute;left:10px;right:230px;bottom:8px;font-size:11px;color:var(--muted);pointer-events:none}
+.transport{display:flex;gap:8px 14px;flex-wrap:wrap;align-items:center;margin-top:8px;font-size:12.5px}
+.transport input[type=range]{flex:1;min-width:160px;accent-color:var(--hyb)}
+.transport input[type=number]{width:70px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;padding:3px 6px}
+.transport select{width:auto}
+#scope-wrap{height:164px;margin-top:8px;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+#scope{width:100%;height:100%;display:block}
+#scope-wrap.tall{height:226px}
+#learn-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:10px}
+.lcard{border:1px solid var(--line);border-left:4px solid var(--hyb);border-radius:8px;padding:8px 12px}
+.lcard.pzr{border-left-color:var(--pzr)} .lcard.cap{border-left-color:var(--cap)}
+.lcard h4{margin:2px 0 4px} .lcard p{margin:4px 0;font-size:13px}
+.lsrc{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+.lsrc a{font-size:11.5px;color:var(--hyb-t);border:1px solid var(--line);border-radius:12px;padding:2px 9px;text-decoration:none}
+.lsrc a:hover{border-color:var(--hyb)}
+.lsrc span{font-size:11.5px;color:var(--muted);border:1px dashed var(--line);border-radius:12px;padding:2px 9px}
+#kb-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:20;align-items:center;justify-content:center;padding:24px}
+.kb-box{background:var(--card);color:var(--ink);border-radius:10px;max-width:900px;width:100%;max-height:88vh;display:flex;flex-direction:column;border:1px solid var(--line)}
+.kb-head{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line)}
+#kb-body{overflow:auto;padding:6px 16px 16px;font-size:13px}
+#kb-body h3{margin-top:4px}
+
+.hsel{font-size:12.5px;color:var(--muted);display:inline-flex;gap:6px;align-items:center} .hsel select{width:auto;max-width:250px}
+.pfilter{position:sticky;top:0;z-index:2;background:var(--card);padding:8px 12px;border-bottom:1px solid var(--line);display:flex;gap:8px;align-items:center}
+.pfilter input{flex:1;min-width:0;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:5px 8px;font:inherit;font-size:12.5px}
+.pfilter .seg button{padding:4px 9px;font-size:12px}
+#story{margin-bottom:8px}
+#story .steps{display:flex;gap:4px;flex-wrap:wrap}
+#story .steps span{font-size:12px;padding:3px 10px;border-radius:14px;border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+#story .steps span.done{border-color:var(--hyb);color:var(--hyb-t)}
+#story .steps span.on{background:var(--hyb);border-color:var(--hyb);color:#fff;font-weight:600}
+#story .steps span.warnstep.on{background:var(--red);border-color:var(--red)}
+#story .say{font-size:13.5px;margin-top:6px;min-height:40px;line-height:1.5}
+.pvr{flex:1;position:relative;padding-bottom:17px} .pvr input{width:100%;accent-color:var(--hyb);display:block}
+#pmarks{position:absolute;left:0;right:0;bottom:0;height:17px;pointer-events:none}
+#pmarks span{position:absolute;transform:translateX(-50%);font-size:10.5px;color:var(--pzr-t);white-space:nowrap;top:5px}
+#pmarks span i{position:absolute;left:50%;top:-6px;width:1.5px;height:6px;background:var(--pzr)} #pmarks span.none{color:var(--muted)}
+.kpi.pzo .v{color:var(--pzo-t)} .lcard.pzo{border-left-color:var(--pzo)}
+.tab.star{border-color:var(--hyb);color:var(--hyb-t);font-weight:600} .tab.star.on{color:#fff}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 10px}
+.chip{border-radius:16px;padding:5px 13px} .chip.on{background:var(--hyb);color:#fff;border-color:var(--hyb)}
+.optcard{border:1px solid var(--hyb);border-left:5px solid var(--hyb);border-radius:9px;padding:10px 14px;margin-bottom:8px}
+.optcard .k{font-size:12px;color:var(--muted)} .optcard .d{font-size:15px;margin:2px 0 6px}
+.scrollx{overflow-x:auto} #opt-single td.hit,.optmx td.hit{background:rgba(91,75,138,.14);font-weight:700}
+.optmx td,.optmx th{text-align:center;white-space:nowrap} .optmx a,#opt-front a{color:var(--hyb-t);font-weight:700}
+.optcmp{border:1px solid var(--line);border-radius:9px;padding:6px 14px 2px;margin-bottom:8px} .optcmp td.hit{background:rgba(30,123,74,.14);font-weight:700}
+.pzwhy{min-width:300px;font-size:12px}
+.pzrec{margin:4px 0 6px;padding-left:20px} .pzrec li{margin-bottom:3px}
+#opt-prog{height:6px;background:var(--grid);border-radius:3px;overflow:hidden;margin:4px 0 10px} #opt-bar{height:100%;width:0;background:var(--hyb)}
+</style>
+</head>
+<body>
+<header>
+  <h1>Hybrid Taxel Simulator</h1>
+  <span class="sub">PzR dome + capacitive + piezo</span>
+  <span class="sp"></span>
+  <span id="status"></span>
+  <label class="hsel" title="ชุดค่าที่ตั้งไว้ให้ลองเทียบกัน">ชุดค่า <select id="preset"></select></label>
+  <button id="reset">ค่าเริ่มต้น</button>
+  <button id="exp-json">บันทึกค่า (.json)</button>
+  <label class="btn">โหลดค่า<input id="imp-json" type="file" accept=".json" hidden></label>
+  <button onclick="document.documentElement.dataset.theme = (document.documentElement.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'))==='dark'?'light':'dark'; renderAll(); Stage.drawScope(); Viz3D.requestRender()">สว่าง/มืด</button>
+  <button id="lang-btn">EN</button>
+</header>
+<div class="wrap">
+  <aside id="params"></aside>
+  <main>
+    <div class="card" id="stage-card">
+      <div class="stagebar">
+        <div class="seg" id="view-seg">
+          <button data-v="3d" class="on" title="โมเดล 3 มิติของ taxel ที่ยุบตามแรงกดจริงจาก model">3-D</button>
+          <button data-v="sec" title="ภาพตัดที่แนวกลาง: ความจุของ gap, เส้นสนามไฟฟ้า และเส้นทางกระแส">ภาพตัดขวาง</button>
+          <button data-v="cir" title="วงจร A และ B ที่ใช้ E1 ร่วมกัน พร้อมค่าปัจจุบันของทุกชิ้น">วงจร A/B</button>
+          <button data-v="arr" title="array ทั้งแผ่น: ลากนิ้วจำลองเพื่อดูสองช่องสัญญาณ">Array</button>
+        </div>
+        <div class="vopts" id="opts-3d">
+          <label title="แยกแต่ละชั้นออกจากกันในแนวดิ่ง"><input type="checkbox" id="o-explode"> แยกชั้น</label>
+          <label title="ตัดครึ่งที่ y = 0 เพื่อดูหน้าตัด"><input type="checkbox" id="o-section" checked> ตัดครึ่ง</label>
+          <label title="ชื่อและความหนาของแต่ละชั้น"><input type="checkbox" id="o-labels" checked> ป้ายชื่อ</label>
+          <label title="ขยายเฉพาะแนวดิ่งของทุกชั้น ×1 = สัดส่วนจริง">ขยายแนวดิ่ง <input type="range" id="o-exag" min="1" max="20" step="1" value="3"> <b id="o-exag-v">×3</b></label>
+        </div>
+        <div class="vopts" id="opts-sec" style="display:none">
+          <label title="ขยายเฉพาะบริเวณปลาย dome ถึง stack"><input type="checkbox" id="o-zoom"> ซูมบริเวณ gap</label>
+          <label title="เส้นสนามไฟฟ้าโดยประมาณ (ตรงแนวดิ่ง ไม่รวม fringing)"><input type="checkbox" id="o-field" checked> เส้นสนามไฟฟ้า (approximate)</label>
+        </div>
+        <div class="vopts" id="opts-cir" style="display:none">
+          <div class="seg" id="cir-mode"><button data-m="dc" class="on" title="อ่าน R ด้วย voltage divider">DC</button><button data-m="ac" title="กระตุ้นด้วย AC แล้วแยก R กับ C ด้วย lock-in">AC / lock-in</button></div>
+          <label title="ความถี่ excitation (ค่าเดียวกับหมวดวงจรอ่านค่า)">ความถี่ <input type="range" id="o-freq" min="0" max="3" step="0.01" value="2"> <b id="o-freq-v">100 kHz</b></label>
+        </div>
+        <div class="vopts" id="opts-arr" style="display:none">
+          <select id="a-shape" title="นิ้ว: การกระจายแรงแบบ Hertz บนวงสัมผัส · วัตถุแข็ง: แรงกดสม่ำเสมอ (สมมติฐาน)"><option value="finger">ปลายนิ้ว (Hertz)</option><option value="flat">วัตถุแข็งหน้าเรียบ</option></select>
+          <label>รัศมี <input type="range" id="a-r" min="2" max="15" step="0.5" value="6"> <b id="a-r-v">6 mm</b></label>
+          <label>แรง <input type="range" id="a-f" min="0.5" max="40" step="0.5" value="5"> <b id="a-f-v">5 N</b></label>
+          <label title="เลื่อนนิ้วไปกลับ 12 mm/s"><input type="checkbox" id="a-auto"> เลื่อนอัตโนมัติ</label>
+          <label title="อัปเดตภาพตาม frame rate ของ readout ที่ตั้งไว้"><input type="checkbox" id="a-real"> แสดงตาม frame rate จริง</label>
+        </div>
+      </div>
+      <div id="story"></div>
+      <div id="stage">
+        <div id="v-3d" class="view"><div id="three-host"></div><canvas id="three-ov"></canvas><div class="vhint">ลาก = หมุน · scroll = ซูม · Shift+ลาก = เลื่อน · ดับเบิลคลิก = มุมเริ่มต้น · จุดเหลือง = contact patch (รัศมี a จาก model)</div></div>
+        <div id="v-sec" class="view" style="display:none"><canvas id="sec-cv"></canvas></div>
+        <div id="v-cir" class="view" style="display:none"><svg id="cir-svg" preserveAspectRatio="xMidYMid meet"></svg></div>
+        <div id="v-arr" class="view" style="display:none"><canvas id="arr-cv"></canvas><div id="arr-info" class="note"></div></div>
+      </div>
+      <div class="transport">
+        <button class="primary" id="an-play" title="ไล่แรงกดขึ้น ค้าง แล้วปล่อย — ทุกมุมมอง ตัวเลข และกราฟอัปเดตพร้อมกัน">▶ กด–ค้าง–ปล่อย</button>
+        <input type="range" id="an-scrub" min="0" max="1000" value="0" title="timeline: ลากเพื่อดูทีละจังหวะ">
+        <label title="แรงกดสูงสุดของ animation">สูงสุด <input type="number" id="an-peak" value="450" min="1" step="10"> kPa</label>
+        <label title="เล่นช้าลง 4 เท่า"><input type="checkbox" id="an-slow"> ช้า ×¼</label>
+        <label><input type="checkbox" id="an-loop"> วนซ้ำ</label>
+        <label title="รูปแบบการกด: ค้าง = ดู creep/drift · เคาะและสั่น = เห็นช่อง piezo ชัด">แบบ <select id="an-shape"><option value="hold">กด–ค้าง–ปล่อย</option><option value="tap">เคาะ 3 ครั้ง</option><option value="vib">ค้าง + สั่น 5 Hz</option></select></label>
+        <label title="เร่งเวลาของช่วง hold ใน model creep/drift (SLS + log-time) · ไม่ได้จำลองการคืนตัวตอนปล่อย">เวลา hold จำลอง <select id="an-accel"><option value="1">จริง</option><option value="60">×60</option><option value="600">×600</option></select></label>
+        <label title="อุณหภูมิที่ต่างจากตอน calibrate: ยางนิ่ม/แข็งขึ้น, εr และ R ของ CNT เปลี่ยน, piezo ให้ประจุ pyroelectric">อุณหภูมิ ΔT <input type="range" id="env-dT" min="-20" max="40" step="1" value="0" style="flex:0 0 90px;min-width:90px"> <b id="env-dT-v">0 K</b></label>
+        <span id="an-phase" class="note"></span>
+      </div>
+      <div class="pv"><b>แรงกดที่ดู</b><div class="pvr"><input id="pview" type="range" min="-1.5" max="3.3" step="0.01"><div id="pmarks"></div></div><input id="pview-n" type="number" step="any"> kPa</div>
+      <div id="scope-wrap" title="oscilloscope: แรงที่ประมาณจากแต่ละช่อง (calibration ตอน t = 0), R(t), C_A(t), C_B(t)"><canvas id="scope"></canvas></div>
+      <div id="kpis"></div><div id="warns"></div>
+    </div>
+    <div class="tabs">
+      <button class="tab on" data-t="sig">สัญญาณ vs แรง</button>
+      <button class="tab star" data-t="opt">★ หาค่าที่ดีที่สุด</button>
+      <button class="tab" data-t="mech">กลไก</button>
+      <button class="tab" data-t="cnt">CNT &amp; การพิมพ์</button>
+      <button class="tab" data-t="rd">วงจรอ่านค่า</button>
+      <button class="tab" data-t="time">drift / creep / รวมสัญญาณ</button>
+      <button class="tab" data-t="data">ข้อมูลจริง</button>
+      <button class="tab" data-t="about">สมมติฐานของ model</button>
+      <button class="tab" data-t="learn">เรียนรู้กลไก</button>
+    </div>
+    <div class="card pane" id="pane-sig">
+      <div class="grid2"><div class="ch" id="c-R"></div><div class="ch" id="c-C"></div><div class="ch" id="c-I"></div><div class="ch" id="c-res"></div></div>
+      <p class="note">เส้นประแดง = แรงที่ dome แรกแตะ · ซ้ายของเส้นนี้ช่อง R ไม่มีสัญญาณ (dead-zone) แต่ C_A และ C_B ยังเปลี่ยน · กราฟ resolution = noise ของวงจร ÷ ความชันของสัญญาณ (ตั้งค่า noise ในหมวด "วงจรอ่านค่า")</p>
+    </div>
+    <div class="card pane" id="pane-opt" style="display:none">
+      <h3>ให้ simulator ลองทุกแบบ แล้วบอกว่าแบบไหนดีที่สุด</h3>
+      <p class="note">ข้อ 1–4 เลือกโครงสร้างของชั้น capacitive และ micro-gap · ข้อ 5 เทียบวัสดุ piezo จาก Table 1 เมื่อใช้เป็น dielectric ระหว่าง E1–E2 (คำนวณทันที ไม่ต้องกดปุ่ม)</p>
+      <p>คำนวณทุกการผสมของ <b>วัสดุ dielectric × ความพรุน × ความหนา × ชนิด electrode × ความหนา PI × micro-gap</b> ด้วย model เดียวกับด้านบน แล้วให้คะแนน 7 ด้าน ค่าเริ่มต้นแสดงเฉพาะแบบที่ผลิตได้ด้วยกระบวนการ s-gDLP ทุกชั้น (เอาเครื่องหมายออกเพื่อเทียบกับแบบที่ใช้ฟิล์มและโลหะ) ค่าอื่นทั้งหมด (dome, CNT, วงจรอ่าน, piezo) ใช้ตามที่ตั้งไว้ในแผงซ้าย</p>
+      <div class="trow"><button class="primary" id="opt-fast">คำนวณแบบเร็ว</button><button id="opt-full">คำนวณแบบละเอียด</button><label style="flex-direction:row;align-items:center;gap:6px;color:var(--ink);font-size:13px" title="เหลือเฉพาะแบบที่ dielectric เป็น TPU resin, electrode เป็น resin-CNT และไม่มีฟิล์ม PI — ทุกชั้นทำด้วย s-gDLP"><input type="checkbox" id="opt-printed" checked style="width:auto"> เฉพาะแบบที่พิมพ์ด้วย s-gDLP ได้ทุกชั้น</label><span id="opt-status" class="note">ยังไม่ได้คำนวณ</span></div>
+      <div id="opt-prog" style="display:none"><div id="opt-bar"></div></div>
+      <h4>1 · เลือกสิ่งที่ต้องการ (1–3 ด้าน) แล้วดูแบบที่แนะนำ</h4>
+      <div id="opt-goals" class="chips"></div>
+      <div id="opt-pick"><p class="note">กด “คำนวณ” ก่อน</p></div>
+      <h4>2 · ถ้าต้องการให้ดีที่สุดเพียงด้านเดียว</h4>
+      <div id="opt-single" class="scrollx"></div>
+      <h4>3 · ถ้าต้องการสองด้านพร้อมกัน (คลิกช่องเพื่อดูรายละเอียด)</h4>
+      <div id="opt-matrix" class="scrollx"></div>
+      <h4>4 · ภาพรวมของทุกแบบ: ได้อย่างเสียอย่าง</h4>
+      <div class="trow"><label>แกน X<select id="opt-x"></select></label><label>แกน Y<select id="opt-y"></select></label></div>
+      <div class="ch" id="opt-chart" style="height:340px"></div>
+      <div id="opt-front" class="note"></div>
+      <h4>5 · วัสดุ piezo ที่ใช้เป็น dielectric ระหว่าง E1–E2: ทุกกลุ่มใน Table 1 ของ Tang 2025</h4>
+      <div id="opt-piezo" class="scrollx"></div>
+      <p class="note">วิธีเลือก: ปรับทุกด้านเป็นสเกล 0 (ดีที่สุดในชุด) ถึง 1 (แย่ที่สุด) แล้วเลือกแบบที่ด้านที่แย่ที่สุดในกลุ่มที่เลือกมีค่าน้อยที่สุด (min–max) · ผลขึ้นกับค่าที่ยัง ⚠ ต้องวัด (modulus ของ TPU, noise จริง, สัมประสิทธิ์อุณหภูมิ, β ของ large deflection) และ “ผลิตง่าย” เป็นคะแนนที่ประเมินเอง ใช้ผลนี้เพื่อเลือกว่าควรทดลองแบบไหนก่อน ไม่ใช่คำตอบสุดท้าย</p>
+    </div>
+    <div class="card pane" id="pane-mech" style="display:none">
+      <div class="grid2"><div class="ch" id="c-w"></div><div class="ch" id="c-n"></div></div>
+      <div class="two"><div><h4>แรงบน dome แต่ละลูก ที่แรงกดที่ดู</h4><div id="dome-table"></div></div>
+      <div><h4>การยุบของแผ่นบน (มองจากด้านบน)</h4><canvas id="heat"></canvas><div class="note" id="heat-cap"></div></div></div>
+      <h4>ชั้นของ stack capacitive</h4><div id="stack-table"></div>
+    </div>
+    <div class="card pane" id="pane-cnt" style="display:none">
+      <div class="grid2"><div class="ch" id="c-sig"></div><div class="ch" id="c-exp"></div><div class="ch" id="c-cure"></div><div id="cnt-info"></div></div>
+    </div>
+    <div class="card pane" id="pane-rd" style="display:none">
+      <div class="grid2"><div class="ch" id="c-bode"></div><div class="ch" id="c-phase"></div></div>
+      <div id="rd-info"></div>
+    </div>
+    <div class="card pane" id="pane-time" style="display:none">
+      <div class="trow">
+        <label>แรงที่กดค้าง (kPa)<input id="t-p" type="number" value="150"></label>
+        <label>นานเท่าไร (นาที)<input id="t-hold" type="number" value="30"></label>
+        <label>ทีละ (s)<input id="t-dt" type="number" value="10"></label>
+        <label>อุณหภูมิเพิ่ม ΔT (K)<input id="t-dT" type="number" value="0"></label>
+        <label>τ ของ complementary filter (s)<input id="t-tau" type="number" value="120"></label>
+        <button class="primary" id="t-run">รัน</button>
+      </div>
+      <div class="ch" id="c-est" style="height:360px"></div>
+      <div id="time-info"></div>
+    </div>
+    <div class="card pane" id="pane-data" style="display:none">
+      <h3>เอาค่าวัดจริงมาซ้อนและ fit</h3>
+      <p>ไฟล์ CSV แถวแรกเป็นหัวคอลัมน์: <code>p_kPa</code> (บังคับ) และอย่างน้อยหนึ่งใน <code>R_ohm</code>, <code>I_A</code>, <code>C_pF</code></p>
+      <div class="trow">
+        <label class="btn">เลือกไฟล์ CSV<input id="csv-file" type="file" accept=".csv,.txt" hidden></label>
+        <button id="sample">ดาวน์โหลดไฟล์ตัวอย่าง</button>
+        <button id="fit-R">fit ช่อง R (ρₜ, film □)</button>
+        <button id="fit-C">fit ช่อง C (parasitic, porosity)</button>
+        <button id="exp-csv">ส่งออกผล sweep (.csv)</button>
+      </div>
+      <div id="data-msg" class="note"></div>
+      <p class="note">ไฟล์ตัวอย่างเป็นตัวเลขสมมติเพื่อดูรูปแบบเท่านั้น ไม่ใช่ค่าวัดจริง</p>
+    </div>
+    <div class="card pane about" id="pane-about" style="display:none">
+      <h3>สมมติฐานของ model (อ่านก่อนเชื่อตัวเลข)</h3>
+      <ul>
+        <li><b>ลำดับชั้นของ stack</b> (ล่าง→บน): E1 → base PI → dielectric → E2 → cover PI · E1 อยู่ผิวล่างสุดจึงแตะชั้น CNT ของ dome ได้โดยตรง ตรงกับที่ model ช่อง A คิด · ⚠ base PI อยู่ระหว่าง E1 กับ E2 ด้วย แต่ C_B ของ model คิดเฉพาะ dielectric (ไม่รวม PI ที่ต่ออนุกรม) ค่า C_B จริงจึงต่ำกว่า model เล็กน้อย — ตั้ง "PI ที่รองรับ E1" = 0 ถ้า E1 พิมพ์ลงบน dielectric โดยตรง</li>
+        <li><b>Large deflection</b>: เมื่อแผ่นบนยุบมากเทียบกับความหนา แผ่นจะยืดและแข็งขึ้น ใช้รูป w_linear = w(1 + β(w/tₑ)²) กับค่าเฉลี่ยของการยุบ โดย tₑ = √(12D/A) (A = ความแข็งแบบยืดรวมของทุกชั้น) · β เป็นค่าของแผ่นขอบยึดแน่นไม่เลื่อน ซึ่งเป็นขอบบนของความแข็ง (border ยางจริงยอมให้ขอบขยับได้บ้าง) · ปิดได้ในหมวด “การคำนวณ”</li>
+        <li><b>border ยุบตัว</b>: border เป็นแถบยาง TPU ที่ยึดสองหน้า รับแรงส่วนที่ dome ไม่ได้รับ ยุบ = (p·a² − ΣF_dome)/k_b โดย k_b = E(1+2S²)A_b/H₀ (Gent–Lindley) ทั้ง stack จึงเลื่อนลงและ dome ที่เตี้ยกว่าแตะตามได้ที่แรงสูง · ปิดได้ในหมวด “การคำนวณ”</li>
+        <li><b>ความต้านทานช่อง A (สมการใหม่)</b>: ต่อ dome = ผิวสัมผัส ρₜ/A_r + กระจายจากวงสัมผัส R_s/8π + ทางเดินบนฟิล์มตามผิว dome · ถ้า E1 เป็น resin-CNT คิดเป็นแผ่นต้านทานและแก้เป็นโครงข่ายด้วย superposition · ρₜ และ film □ fit กับกระแสของ MEMS 2026</li>
+        <li><b>วัสดุ piezo เป็น dielectric (แบบที่ยืนยันแล้ว)</b>: เลือกวัสดุ piezo จาก Table 1 ที่ช่อง “วัสดุ dielectric” สัญญาณ piezo อ่านระหว่าง E1 กับ E2 ไม่มี E3 · C ของคู่เดียวกันคำนวณด้วย model dielectric เดิม ซึ่งให้ ΔC ≈ 0 สำหรับวัสดุเนื้อตัน (แข็งระดับ GPa) · รูปแบบพรุนใช้ d33 ของเนื้อตันและความแข็ง Gibson–Ashby ⚠ ไม่มีค่าที่วัดจริง · ทางเลือกเดิม (piezo เป็นชั้นที่สามบน E2 พร้อม E3) ยังเลือกได้ที่ช่อง “ชั้นบนสุด”</li>
+        <li><b>สัญญาณ piezo</b>: โหมด d33 อย่างเดียว Q = d33·p·A บนพื้นที่ electrode, ไม่รวม d31 จากการดัด · ฟิล์มเป็นแหล่งประจุขนานกับ C ของฟิล์ม + สาย และรั่วผ่าน R ขาเข้า · pyroelectric: Q = p_pyro·A·ΔT · E3 เป็นโลหะบาง</li>
+        <li><b>อุณหภูมิ</b>: ปรับ modulus ของ TPU และ dielectric, εr (TCC) และ R ของ CNT (TCR) แบบเส้นตรงตาม ΔT · calibration อยู่ที่ ΔT = 0 · ไม่รวมการขยายตัวตามความร้อน (gap 30 µm เปลี่ยนน้อยกว่า 0.1 µm ต่อ 10 K เพราะ border กับ dome เป็น TPU เดียวกัน)</li>
+        <li><b>noise</b>: noise ของชิปอ่าน C รวมกับ noise ของระบบจริง (ค่าเริ่มต้น 1 fF ⚠) แบบ root-sum-square</li>
+        <li><b>แผ่นบน (stack capacitive)</b> เป็นแผ่นสี่เหลี่ยมยึดแน่นที่ border รับแรงกดสม่ำเสมอ แก้ด้วย finite difference (biharmonic, 13-point) · ตรวจแล้วได้ w = 0.00128 qL⁴/D (ทฤษฎี 0.00126) · ไม่รวม large-deflection / membrane stretching</li>
+        <li><b>dome</b> เป็น paraboloid สัมผัสแบบ Hertz (รัศมีปลาย R = r²/2h) · ใช้ได้ดีเมื่อ dome ยุบไม่เกิน ~30% ของความสูง · แผ่นบนแข็งกว่า TPU มาก</li>
+        <li><b>ความต้านทานช่อง A</b> = constriction (Holm, ρ/4a) + film/tunneling (ρₜ/A_real) + ทางเดินบน film ของ dome + film ถึง pad · พื้นที่สัมผัสจริง A_real = F/H (asperity) ไม่เกินพื้นที่ Hertz</li>
+        <li><b>CNT</b>: percolation σ = σ₀(φ − φc)^t · fit ให้ 5 wt% ≈ 4×10⁻³ S/cm ตามกราฟ Zaki AFM 2025 Fig. 2I · wt% อื่นเป็นการ extrapolate</li>
+        <li><b>การพิมพ์</b>: Jacobs working curve Cd = Dp·ln(t/tc) · fit ให้ 5 wt% ได้ 20 µm ที่ 350 s (AFM 2025 p.6) · จุดที่สอง (50 µm ที่ 1000 s) ไม่พบใน paper — ต้องยืนยัน · Grayscale ใช้สูตร z = Dp·ln(tG/(T₀·255)) ของ Zaki</li>
+        <li><b>C_A</b> (E1 กับชั้น CNT ก่อนแตะ) = ∫ε₀/gap dA แบบ parallel-plate ไม่รวม fringing</li>
+        <li><b>C_B</b> (E1–E2): dielectric ตันใช้ shape factor (ยางตันโป่งข้าง ยุบยาก) · dielectric พรุนใช้ Gibson–Ashby E(1−φ)² ที่รูพรุนค่อย ๆ ยุบ · εr ผสมแบบ Lichtenecker</li>
+        <li><b>Creep</b> = standard linear solid (ลด modulus ตามเวลา) ใช้กับ TPU และ dielectric · <b>drift</b> ของ R ตาม log ของเวลา · ไม่ได้จำลอง hysteresis ของ loop ขึ้น-ลง</li>
+        <li><b>ค่าที่มี ⚠</b> (modulus ของ TPU, TCR, creep) เป็นค่าเดา ต้องวัดจริงก่อนใช้ตัวเลขในงานวิจัย · ใช้แท็บ "ข้อมูลจริง" fit ค่าเหล่านี้</li>
+        <li>model นี้ใช้เพื่อดูแนวโน้มและ trade-off ไม่ใช่ FEM · ถ้าจะออกแบบจริงควรยืนยันด้วย COMSOL/Abaqus และการวัด</li>
+      </ul>
+      <h4>แหล่งที่มาหลัก</h4>
+      <ul><li>Zaki et al., Adv. Funct. Mater. 2025, e15914 · Zaki & Chen, IEEE MEMS 2026 · Yin et al., Sens. Actuators Rep. 2024 (AD7745) · Fonseca et al., IEEE TII 2023 (drift 5.8%/log min)</li></ul>
+    </div>
+    <div class="card pane" id="pane-learn" style="display:none">
+      <h3>กลไกของ sensor — อธิบายสั้น ๆ พร้อมที่มา</h3>
+      <div id="learn-cards"></div>
+      <h4>ฐานความรู้จาก paper (knowledge/)</h4>
+      <div id="kb-list" class="lsrc"></div>
+      <p class="note">คลิกเพื่ออ่านสรุปของแต่ละ paper (ตัวเลขทุกค่าระบุหน้า/รูป) · <code>parameters_from_papers</code> บอกที่มาของทุก parameter และค่าที่ยัง ⚠ ต้องวัด</p>
+    </div>
+  </main>
+</div>
+<div id="kb-modal"><div class="kb-box"><div class="kb-head"><b id="kb-title"></b><button id="kb-close">ปิด</button></div><div id="kb-body"></div></div></div>
+<script>/*THREE*/</script>
+<script>/*CHART*/</script>
+<script>/*I18N*/</script>
+<script>/*PHYSICS*/</script>
+<script>/*DEFAULTS*/</script>
+<script>/*KNOWLEDGE*/</script>
+<script>/*VIZ3D*/</script>
+<script>/*UI*/</script>
+<script>/*VIEWS*/</script>
+<script>/*OPT*/</script>
+</body>
+</html>
